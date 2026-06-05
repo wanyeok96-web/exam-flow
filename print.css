@@ -1,0 +1,1161 @@
+/* Exam Flow — 출력물 전용 인쇄 스타일 */
+
+@media print {
+  body.print-mode * {
+    visibility: hidden;
+  }
+
+  body.print-mode #output-preview,
+  body.print-mode #output-preview * {
+    visibility: visible;
+  }
+
+  body.print-mode #output-preview {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    border: none;
+    padding: 0;
+    margin: 0;
+    background: #fff;
+  }
+
+  .app-header,
+  .privacy-notice,
+  .step-nav,
+  .step-panel:not(#step-5),
+  .output-index-row,
+  .output-tab-body,
+  .preview-toolbar,
+  .output-validation-banner,
+  .validation-card,
+  .app-footer,
+  .no-print {
+    display: none !important;
+  }
+
+  #step-5 {
+    display: block !important;
+  }
+
+  .print-doc {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .print-doc:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  .doc-table th,
+  .doc-table td {
+    border: 1px solid #000 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .seat-layout-table td {
+    border: 1px solid #000 !important;
+  }
+
+  .move-badge {
+    background: #fef3c7 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* 용지 크기 — body 클래스로 제어 */
+body.print-size-a4-portrait {
+  --print-page-width: 210mm;
+  --seat-printable-mm: 273mm;
+  --seat-page-width-mm: 186mm;
+}
+
+body.print-size-a4-landscape {
+  --print-page-width: 297mm;
+  --seat-printable-mm: 190mm;
+  --seat-page-width-mm: 277mm;
+}
+
+body.print-size-b4-landscape {
+  --print-page-width: 364mm;
+  --seat-printable-mm: 237mm;
+  --seat-page-width-mm: 344mm;
+}
+
+body.print-size-b4-portrait {
+  --print-page-width: 257mm;
+  --seat-printable-mm: 348mm;
+  --seat-page-width-mm: 241mm;
+}
+
+@media print {
+  @page {
+    size: A4 portrait;
+    margin: 10mm 12mm 14mm;
+  }
+}
+
+/* 인쇄 시 body 클래스에 따라 @page size 힌트 (브라우저·OS 설정과 병행) */
+@media print {
+  body.print-size-a4-portrait { /* 브라우저 인쇄 대화상자: A4 세로 */ }
+  body.print-size-a4-landscape { /* 브라우저 인쇄 대화상자: A4 가로 */ }
+  body.print-size-b4-landscape { /* 브라우저 인쇄 대화상자: B4 가로 */ }
+}
+
+/* 출력물 본문 (화면·인쇄 공통) */
+.print-doc {
+  font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  color: #000;
+  background: #fff;
+  line-height: 1.4;
+}
+
+.doc-header {
+  text-align: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 2px solid #000;
+}
+
+.doc-header .doc-school {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 0 0 0.25rem;
+  letter-spacing: 0.02em;
+}
+
+.doc-header h1 {
+  font-size: 1.15rem;
+  font-weight: 700;
+  margin-bottom: 0.35rem;
+}
+
+.doc-header .doc-sub {
+  font-size: 0.95rem;
+  margin: 0.15rem 0;
+}
+
+.doc-header .doc-meta {
+  font-size: 0.9rem;
+  margin: 0.1rem 0;
+}
+
+.doc-validation-inline {
+  font-size: 0.8rem;
+  color: #b45309;
+  margin-bottom: 0.5rem;
+  padding: 0.35rem 0.5rem;
+  border: 1px solid #fcd34d;
+  background: #fffbeb;
+}
+
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.85rem;
+  margin: 0.5rem 0;
+}
+
+.doc-table th,
+.doc-table td {
+  border: 1px solid #333;
+  padding: 0.35rem 0.5rem;
+  text-align: center;
+  vertical-align: middle;
+}
+
+.doc-table th {
+  background: #f0f0f0;
+  font-weight: 600;
+}
+
+.doc-table td.text-left { text-align: left; }
+
+.doc-summary {
+  margin-top: 0.75rem;
+  font-size: 0.9rem;
+  border-top: 1px solid #333;
+  padding-top: 0.5rem;
+}
+
+.doc-summary p { margin: 0.2rem 0; }
+
+/* 좌석배치도 */
+.seat-layout-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0;
+  table-layout: fixed;
+}
+
+.seat-layout-table td {
+  border: 1px solid #333;
+  padding: 0.35rem 0.25rem;
+  text-align: center;
+  vertical-align: middle;
+  width: calc(100% / var(--seat-cols, 4));
+  height: var(--seat-cell-mm, calc((var(--seat-printable-mm, 230mm) - var(--seat-map-chrome, 44mm)) / var(--seat-rows, 5)));
+  min-height: 0;
+  max-height: var(--seat-cell-mm, calc((var(--seat-printable-mm, 230mm) - var(--seat-map-chrome, 44mm)) / var(--seat-rows, 5)));
+  font-size: 0.82rem;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.seat-layout-table td.seat-empty {
+  background-color: #fff;
+  background-image: none;
+  padding: 0;
+}
+
+.seat-layout-table td.seat-map-col-move,
+.seat-layout-table th.seat-map-col-move {
+  background-color: #e8e8e8;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.seat-layout-table th.seat-map-col-label {
+  border: 1px solid #333;
+  padding: 0.25rem 0.15rem;
+  text-align: center;
+  font-size: 0.78rem;
+  font-weight: 700;
+  background: #fff;
+  height: var(--seat-col-label-mm, auto);
+  max-height: var(--seat-col-label-mm, none);
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.seat-layout-table th.seat-map-col-label.seat-map-col-move {
+  background-color: #e8e8e8;
+}
+
+.seat-map-sheet-header {
+  text-align: center;
+  margin-bottom: 0.5rem;
+}
+
+.seat-map-sheet-title {
+  margin: 0 0 0.2rem;
+  font-size: 1.35rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+}
+
+.seat-map-sheet-subtitle {
+  margin: 0 0 0.15rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.seat-map-sheet-meta {
+  margin: 0;
+  font-size: 0.82rem;
+  color: #444;
+}
+
+.seat-map-orient-top,
+.seat-map-orient-bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin: 0.35rem 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+}
+
+.seat-map-orient-bottom {
+  justify-content: flex-end;
+}
+
+.seat-map-teacher-desk,
+.seat-map-door-front,
+.seat-map-door-back {
+  border: 1px solid #333;
+  padding: 0.2rem 0.55rem;
+  line-height: 1.3;
+}
+
+.seat-layout-table td.seat-move-student {
+  background-color: #e8e8e8;
+  -webkit-print-color-adjust: exact;
+  print-color-adjust: exact;
+}
+
+.seat-layout-table .seat-id {
+  font-size: 0.75rem;
+  letter-spacing: -0.02em;
+  margin-bottom: 0.1rem;
+}
+
+.seat-layout-table .seat-name {
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+.seat-map-batch .print-doc,
+.room-assignment-batch .print-doc {
+  page-break-after: always;
+  break-after: page;
+}
+
+.seat-map-batch .print-doc:last-child,
+.room-assignment-batch .print-doc:last-child {
+  page-break-after: auto;
+  break-after: auto;
+}
+
+/* 좌석배치표 — 한 페이지 맞춤 (fit 적용 시) */
+.print-seat-map.seat-map-fit-applied {
+  width: var(--seat-page-width-mm, 186mm);
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.print-seat-map.seat-map-fit-applied .seat-layout-table td {
+  height: var(--seat-cell-mm) !important;
+  min-height: 0 !important;
+  max-height: var(--seat-cell-mm) !important;
+  padding: clamp(0.4mm, calc(var(--seat-cell-mm) * 0.07), 1.2mm) clamp(0.4mm, calc(var(--seat-cell-mm) * 0.05), 1mm);
+  line-height: 1.12;
+  overflow: hidden;
+}
+
+.print-seat-map.seat-map-fit-applied .seat-layout-table th.seat-map-col-label {
+  height: var(--seat-col-label-mm, 6mm) !important;
+  max-height: var(--seat-col-label-mm, 6mm) !important;
+  padding: 0.4mm 0.3mm;
+  line-height: 1.1;
+}
+
+.print-seat-map.seat-map-fit-applied.seat-map-compact .seat-layout-table .seat-id {
+  font-size: clamp(6pt, calc(var(--seat-cell-mm) * 0.52), 7pt);
+  margin-bottom: 0.2mm;
+}
+
+.print-seat-map.seat-map-fit-applied.seat-map-compact .seat-layout-table .seat-name {
+  font-size: clamp(6.5pt, calc(var(--seat-cell-mm) * 0.58), 8pt);
+  line-height: 1.08;
+}
+
+.print-seat-map.seat-map-fit-applied .seat-map-sheet-header {
+  margin-bottom: 0.35rem;
+}
+
+.print-seat-map.seat-map-fit-applied .seat-map-sheet-title {
+  font-size: clamp(1rem, calc(var(--seat-cell-mm) * 0.95), 1.35rem);
+  margin-bottom: 0.1rem;
+}
+
+.print-seat-map.seat-map-fit-applied .seat-map-orient-top,
+.print-seat-map.seat-map-fit-applied .seat-map-orient-bottom {
+  margin: 0.2rem 0;
+}
+
+.move-badge {
+  display: inline-block;
+  font-size: 0.6rem;
+  font-weight: 700;
+  color: #92400e;
+  background: #fef3c7;
+  border: 1px solid #f59e0b;
+  padding: 0.05rem 0.3rem;
+  margin-top: 0.2rem;
+  border-radius: 2px;
+}
+
+.door-marker {
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border: 2px solid #333;
+  font-size: 0.8rem;
+  font-weight: 600;
+  display: inline-block;
+}
+
+.door-marker.door-left { float: left; }
+.door-marker.door-right { float: right; }
+.door-marker.door-center {
+  display: block;
+  text-align: center;
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content;
+  float: none;
+}
+
+.seat-map-footer { clear: both; }
+
+/* 개인별 시간표 — 학급 일괄 */
+.personal-class-batch .print-doc {
+  margin-bottom: 2rem;
+  padding-bottom: 1rem;
+  border-bottom: 1px dashed #ccc;
+}
+
+.personal-class-batch .print-doc:last-child {
+  border-bottom: none;
+}
+
+/* 결시 강조 */
+.absence-row td { background: #fef2f2; }
+
+.note-select-screen {
+  width: 100%;
+  font-size: 0.8rem;
+  padding: 0.2rem;
+}
+
+.print-only-note { display: none; }
+
+@media print {
+  .note-select-screen { display: none !important; }
+  .print-only-note { display: inline !important; }
+  .no-print { display: none !important; }
+}
+
+/* ========== 칠판 부착용 좌석안내도 ========== */
+
+.board-seat-guide {
+  max-width: 100%;
+  padding: 0.5rem 0.25rem;
+  text-align: center;
+}
+
+.board-seat-guide__school {
+  font-size: 1.1rem;
+  font-weight: 700;
+  margin: 0 0 0.35rem;
+}
+
+.board-seat-guide__title {
+  font-size: 1.5rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  margin: 0 0 0.75rem;
+  border: none;
+}
+
+.board-seat-guide__top-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 0.5rem;
+  padding: 0 0.25rem;
+  font-size: 0.95rem;
+  font-weight: 600;
+}
+
+.board-seat-guide__teacher-desk {
+  text-align: left;
+}
+
+.board-seat-guide__door-front {
+  text-align: right;
+}
+
+.board-seat-guide__grid {
+  display: flex;
+  justify-content: center;
+  gap: 0.35rem;
+  margin: 0.5rem 0 1rem;
+  flex-wrap: nowrap;
+}
+
+.board-seat-guide__column {
+  flex: 1;
+  max-width: calc((100% - 2rem) / var(--board-cols, 5));
+  border: 2px solid #000;
+  background: #fff;
+  padding: 0.25rem;
+}
+
+.board-seat-guide__column.is-move-column {
+  background: #e5e5e5;
+  border: 3px solid #000;
+}
+
+.board-seat-guide__col-header {
+  font-size: 0.8rem;
+  font-weight: 600;
+  padding: 0.2rem 0;
+  border-bottom: 1px solid #333;
+  margin-bottom: 0.15rem;
+}
+
+.board-seat-guide__move-label,
+.board-seat-guide__home-label {
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #333;
+  margin-bottom: 0.2rem;
+  letter-spacing: -0.02em;
+}
+
+.board-seat-guide__cell {
+  border: 1px solid #333;
+  margin: 0.15rem 0;
+  padding: 0.35rem 0.15rem;
+  min-height: 2.8rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+}
+
+.board-seat-guide__column.is-move-column .board-seat-guide__cell {
+  background: #ebebeb;
+}
+
+.board-seat-guide__cell.is-empty {
+  background: #f5f5f5;
+}
+
+.board-seat-guide__cell.is-empty .board-seat-guide__number {
+  font-size: 1.4rem;
+  color: #999;
+  font-weight: 700;
+}
+
+.board-seat-guide__number {
+  font-size: 2rem;
+  font-weight: 800;
+  line-height: 1;
+  color: #000;
+}
+
+.board-seat-guide__door-back {
+  text-align: right;
+  font-size: 0.95rem;
+  font-weight: 600;
+  margin-top: 0.5rem;
+  padding-right: 0.25rem;
+}
+
+.board-seat-guide__meta {
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 0.75rem;
+}
+
+@media print {
+  .print-board-seat-guide.board-seat-guide {
+    padding: 0;
+  }
+
+  .board-seat-guide__title {
+    font-size: 18pt;
+    margin-bottom: 6mm;
+  }
+
+  .board-seat-guide__number {
+    font-size: 22pt;
+  }
+
+  .board-seat-guide__cell {
+    min-height: 14mm;
+    padding: 2mm 1mm;
+  }
+
+  .board-seat-guide__column.is-move-column {
+    background: #ddd !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .board-seat-guide__column.is-move-column .board-seat-guide__cell {
+    background: #e8e8e8 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.print-size-a4-portrait .print-board-seat-guide,
+  body.print-size-b4-portrait .print-board-seat-guide {
+    page-break-inside: avoid;
+  }
+}
+
+/* 시험실배정현황 — A4 가로 */
+.class-assignment-table th,
+.class-assignment-table td {
+  font-size: 0.8rem;
+}
+
+.class-assignment-table .period-cell {
+  min-width: 64px;
+  padding: 0.3rem 0.25rem;
+}
+
+.print-room-assignment .doc-header h1 {
+  font-size: 1.05rem;
+}
+
+/* 시험실운영현황 — A4 세로 */
+.print-room-operation .room-op-lines {
+  white-space: pre-line;
+  text-align: left;
+}
+
+.print-room-operation .doc-summary-grid {
+  border-top: 2px solid #333;
+  padding-top: 0.6rem;
+}
+
+/* 인쇄 페이지 번호 (문서 단위) */
+.print-page-footer {
+  display: none;
+}
+
+@media print {
+  .print-page-footer {
+    display: block;
+    text-align: center;
+    font-size: 9pt;
+    color: #333;
+    margin-top: 6mm;
+    padding-top: 2mm;
+    border-top: 1px solid #ccc;
+  }
+
+  .doc-header-print {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* 좌석배치도 — 한 페이지 고정 */
+  .print-seat-map {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    overflow: hidden;
+  }
+
+  .print-seat-map.seat-map-fit-applied {
+    max-height: var(--seat-printable-height-mm, var(--seat-printable-mm, 273mm));
+    page-break-inside: avoid;
+    break-inside: avoid;
+    overflow: hidden;
+  }
+
+  .print-seat-map .seat-layout-table {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .print-seat-map .seat-layout-table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .print-seat-map.seat-map-fit-applied .seat-layout-table td {
+    height: var(--seat-cell-mm) !important;
+    max-height: var(--seat-cell-mm) !important;
+  }
+
+  .print-seat-map.seat-map-fit-applied .seat-layout-table th.seat-map-col-label {
+    height: var(--seat-col-label-mm, 6mm) !important;
+    max-height: var(--seat-col-label-mm, 6mm) !important;
+  }
+
+  .print-seat-map .seat-map-sheet-header {
+    margin-bottom: 1.5mm;
+  }
+
+  .print-seat-map.seat-map-fit-applied .seat-map-sheet-title {
+    font-size: clamp(11pt, calc(var(--seat-cell-mm, 12mm) * 1.05), 16pt);
+    margin-bottom: 0.5mm;
+  }
+
+  .print-seat-map.seat-map-fit-applied .seat-map-sheet-subtitle {
+    font-size: clamp(8pt, calc(var(--seat-cell-mm, 12mm) * 0.72), 10pt);
+  }
+
+  .print-seat-map.seat-map-fit-applied .seat-map-sheet-meta {
+    font-size: clamp(7pt, calc(var(--seat-cell-mm, 12mm) * 0.62), 8pt);
+  }
+
+  .print-seat-map.seat-map-fit-applied .seat-map-orient-top,
+  .print-seat-map.seat-map-fit-applied .seat-map-orient-bottom {
+    margin: 0.8mm 0;
+    font-size: clamp(7pt, calc(var(--seat-cell-mm, 12mm) * 0.62), 8pt);
+  }
+
+  .print-seat-map .seat-map-sheet-title {
+    font-size: 16pt;
+    margin-bottom: 0.8mm;
+  }
+
+  .print-seat-map .seat-map-sheet-subtitle {
+    font-size: 10pt;
+    margin-bottom: 0.5mm;
+  }
+
+  .print-seat-map .seat-map-sheet-meta {
+    font-size: 8pt;
+  }
+
+  .print-seat-map .seat-map-orient-top,
+  .print-seat-map .seat-map-orient-bottom {
+    margin: 1mm 0;
+    font-size: 8pt;
+  }
+
+  .print-seat-map .seat-map-teacher-desk,
+  .print-seat-map .seat-map-door-front,
+  .print-seat-map .seat-map-door-back {
+    padding: 0.8mm 2mm;
+  }
+
+  .print-seat-map .seat-layout-table th.seat-map-col-label {
+    font-size: 7.5pt;
+    padding: 0.8mm 0.5mm;
+  }
+
+  .print-seat-map .doc-validation-inline {
+    margin-bottom: 0.25rem;
+    padding: 0.2rem 0.35rem;
+    font-size: 7pt;
+  }
+
+  .print-seat-map .doc-header {
+    display: none;
+  }
+
+  .print-seat-map .seat-layout-table {
+    margin: 1.5mm 0;
+  }
+
+  .print-seat-map .seat-layout-table td {
+    height: var(--seat-cell-mm, calc((var(--seat-printable-mm, 273mm) - var(--seat-map-chrome, 44mm)) / var(--seat-rows, 5)));
+    min-height: 0;
+    max-height: var(--seat-cell-mm, calc((var(--seat-printable-mm, 273mm) - var(--seat-map-chrome, 44mm)) / var(--seat-rows, 5)));
+    padding: 1mm 0.8mm;
+    font-size: 8pt;
+  }
+
+  .print-seat-map .seat-layout-table .seat-id {
+    font-size: 7pt;
+    margin-bottom: 0.3mm;
+  }
+
+  .print-seat-map .seat-layout-table .seat-name {
+    font-size: 8.5pt;
+    line-height: 1.15;
+  }
+
+  .print-seat-map .print-page-footer {
+    margin-top: 1.5mm;
+    padding-top: 0.8mm;
+    font-size: 7.5pt;
+  }
+
+  /* 응시현황표 — A4 세로, 표 압축 */
+  body.print-size-a4-portrait .print-attendance .doc-table {
+    font-size: 0.78rem;
+  }
+
+  body.print-size-a4-portrait .print-attendance .doc-table th,
+  body.print-size-a4-portrait .print-attendance .doc-table td {
+    padding: 0.2rem 0.3rem;
+  }
+
+  body.print-size-a4-portrait .print-attendance .doc-table thead {
+    display: table-header-group;
+  }
+
+  /* 응시현황표 — 교실·일차 통합 (학급별 블록, 한 페이지) */
+  .print-attendance-matrix {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    overflow: hidden;
+    font-family: "Malgun Gothic", "Apple SD Gothic Neo", sans-serif;
+  }
+
+  .print-attendance-matrix.attendance-fit-applied {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .print-attendance-matrix.attendance-fit-applied .att-matrix-header {
+    margin-bottom: 1mm;
+  }
+
+  .print-attendance-matrix.attendance-fit-applied .att-date-bar {
+    margin-bottom: 1mm;
+  }
+
+  .print-attendance-matrix.attendance-fit-applied .attendance-group-table {
+    margin-bottom: 2mm;
+  }
+
+  .print-attendance-matrix.attendance-fit-applied .attendance-group-table .att-period-subject-row th,
+  .print-attendance-matrix.attendance-fit-applied .attendance-group-table .att-column-head th,
+  .print-attendance-matrix.attendance-fit-applied .attendance-group-table .att-sign-row td {
+    height: 4.2mm;
+    padding: 0.25mm;
+  }
+
+  .print-attendance-matrix.attendance-fit-applied .attendance-matrix-legend {
+    margin-top: 1mm;
+  }
+
+  .print-attendance-matrix .att-matrix-header {
+    text-align: center;
+    margin-bottom: 2mm;
+    padding: 0;
+    border: none;
+  }
+
+  .print-attendance-matrix .att-main-title {
+    font-size: 13pt;
+    font-weight: 700;
+    margin: 0 0 1.5mm;
+    letter-spacing: -0.02em;
+    line-height: 1.25;
+  }
+
+  .print-attendance-matrix .att-room-title {
+    font-weight: 700;
+    font-size: 10pt;
+    margin: 0 0 2mm;
+  }
+
+  .print-attendance-matrix .att-date-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    font-size: 8.5pt;
+    margin-bottom: 1.5mm;
+    padding: 0 0.5mm;
+  }
+
+  .print-attendance-matrix .att-date {
+    flex: 1;
+    text-align: center;
+  }
+
+  .print-attendance-matrix .att-instruction {
+    font-size: 8pt;
+    font-weight: 400;
+    white-space: nowrap;
+  }
+
+  .att-group-stack {
+    width: 100%;
+  }
+
+  .attendance-group-table {
+    width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+    margin-bottom: 3mm;
+    font-size: 8.5pt;
+  }
+
+  .attendance-group-table:last-child {
+    margin-bottom: 0;
+  }
+
+  .attendance-group-table .att-col-group {
+    width: 5.5%;
+  }
+
+  .attendance-group-table .att-col-order {
+    width: 3.2%;
+  }
+
+  .attendance-group-table .att-col-num {
+    width: 4.8%;
+  }
+
+  .attendance-group-table .att-col-name {
+    width: 7.2%;
+  }
+
+  .attendance-group-table .att-col-status {
+    width: 6.5%;
+  }
+
+  .attendance-group-table th,
+  .attendance-group-table td {
+    border: 1px solid #000 !important;
+    text-align: center;
+    vertical-align: middle;
+    padding: 0.35mm 0.25mm;
+    background: #fff;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .attendance-group-table .att-group-label {
+    font-weight: 700;
+    font-size: 8.5pt;
+    line-height: 1.35;
+    padding: 1mm 0.5mm;
+  }
+
+  .attendance-group-table .att-group-label span {
+    display: inline-block;
+    white-space: nowrap;
+  }
+
+  .attendance-group-table .att-period-subject-row th {
+    height: 5mm;
+    font-size: 8pt;
+    font-weight: 600;
+    padding: 0.5mm;
+  }
+
+  .attendance-group-table .att-corner {
+    background: #fff;
+  }
+
+  .attendance-group-table .att-column-head th {
+    height: 5mm;
+    font-size: 8pt;
+    font-weight: 600;
+    padding: 0.5mm;
+  }
+
+  .attendance-group-table .att-data-row td {
+    height: var(--att-data-row-mm, 4.6mm);
+    min-height: 0;
+    max-height: var(--att-data-row-mm, 4.6mm);
+    overflow: hidden;
+    font-size: 8.5pt;
+  }
+
+  .attendance-group-table .att-num {
+    font-size: 8.5pt;
+  }
+
+  .attendance-group-table .att-name {
+    font-size: 8.5pt;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .attendance-group-table .att-status-cell {
+    min-width: 0;
+  }
+
+  .attendance-group-table .att-status-cell.is-elective {
+    background: #d9d9d9 !important;
+  }
+
+  .attendance-group-table .att-sign-row td {
+    height: 5mm;
+    font-size: 8pt;
+    padding: 0.5mm;
+  }
+
+  .attendance-group-table .att-sign-writer {
+    text-align: right;
+    padding-right: 1.5mm;
+  }
+
+  .attendance-group-table .att-sign-seal {
+    text-align: center;
+  }
+
+  .attendance-matrix-legend {
+    display: flex;
+    align-items: center;
+    gap: 1.5mm;
+    font-size: 8pt;
+    margin-top: 2mm;
+    text-align: left;
+  }
+
+  .attendance-matrix-legend .att-legend-mark {
+    display: inline-block;
+    width: 3mm;
+    height: 3mm;
+    background: #d9d9d9;
+    border: 1px solid #bbb;
+    flex-shrink: 0;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .attendance-matrix-legend::before {
+    content: "*";
+    margin-right: 0.5mm;
+  }
+
+  /* 선택과목 응시 학생 — B4 가로 */
+  .print-elective-students {
+    max-width: var(--print-page-width, 364mm);
+  }
+
+  .print-elective-students .es-header {
+    position: relative;
+    border-bottom: none;
+    margin-bottom: 0.35rem;
+    padding-bottom: 0.25rem;
+  }
+
+  .print-elective-students .es-header h1 {
+    font-size: 1.05rem;
+    margin: 0.15rem 0;
+  }
+
+  .print-elective-students .es-subtitle {
+    font-size: 0.92rem;
+    font-weight: 700;
+    margin: 0.1rem 0 0;
+  }
+
+  .print-elective-students .es-room-label {
+    position: absolute;
+    top: 0;
+    right: 0;
+    margin: 0;
+    font-size: 0.82rem;
+    font-weight: 600;
+  }
+
+  .print-elective-students .elective-students-table {
+    font-size: 0.68rem;
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .print-elective-students .elective-students-table th,
+  .print-elective-students .elective-students-table td {
+    padding: 0.12rem 0.15rem;
+    line-height: 1.25;
+    word-break: keep-all;
+  }
+
+  .print-elective-students .es-col-order {
+    width: 1.6rem;
+    min-width: 1.6rem;
+  }
+
+  .print-elective-students .es-col-num {
+    width: 2rem;
+    min-width: 2rem;
+  }
+
+  .print-elective-students .es-col-name {
+    width: 3.2rem;
+    min-width: 3.2rem;
+  }
+
+  .print-elective-students .es-col-total {
+    font-weight: 700;
+  }
+
+  .print-elective-students .es-total-row td {
+    font-weight: 700;
+  }
+
+  body.print-size-b4-landscape .print-elective-students .elective-students-table {
+    font-size: 0.72rem;
+  }
+
+  .elective-students-batch .print-doc {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .elective-students-batch .print-doc:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* 시험실배정현황 — A4 세로 */
+  body.print-size-a4-portrait .print-room-assignment .class-assignment-table {
+    font-size: 0.72rem;
+  }
+
+  body.print-size-a4-portrait .print-room-assignment .class-assignment-table .period-cell {
+    min-width: 52px;
+    padding: 0.2rem 0.15rem;
+  }
+
+  /* 개인별 시간표 — 학급 일괄 페이지 분리 */
+  .personal-class-batch .print-doc {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .personal-class-batch .print-doc:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* 시험실배정현황 — 학급별 분리 */
+  .print-room-assignment {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .print-room-assignment:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* 칠판 안내도 — A4 세로 기본 */
+  body.print-size-a4-portrait .print-board-seat-guide {
+    padding: 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  body.print-size-a4-portrait .board-seat-guide__title {
+    font-size: 1.1rem;
+    margin-bottom: 0.35rem;
+  }
+
+  body.print-size-a4-portrait .board-seat-guide__number {
+    font-size: 11pt;
+    letter-spacing: -0.03em;
+  }
+
+  body.print-size-a4-portrait .board-seat-guide__cell {
+    min-height: 11mm;
+    padding: 0.2rem 0.1rem;
+  }
+
+  body.print-size-a4-portrait .board-seat-guide__col-header,
+  body.print-size-a4-portrait .board-seat-guide__move-label,
+  body.print-size-a4-portrait .board-seat-guide__home-label {
+    font-size: 0.55rem;
+  }
+
+  /* 칠판 안내도 — B4 세로 */
+  body.print-size-b4-portrait .print-board-seat-guide {
+    padding: 0;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  body.print-size-b4-portrait .board-seat-guide__number {
+    font-size: 26pt;
+  }
+
+  body.print-size-b4-portrait .board-seat-guide__cell {
+    min-height: 16mm;
+  }
+
+  .print-room-operation .doc-validation-inline {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  body.print-size-a4-portrait .print-absence .doc-table thead {
+    display: table-header-group;
+  }
+}
