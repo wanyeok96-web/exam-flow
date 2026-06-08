@@ -311,9 +311,9 @@ function getFixedSeatDataForRoom(room) {
   Object.entries(appState.fixedRoomSeats || {}).forEach(([studentId, fixed]) => {
     if (fixed.roomName !== room) return;
     const st = appState.students[studentId];
-    const coord = (fixed.row && fixed.col)
-      ? { row: fixed.row, col: fixed.col }
-      : positions.find(p => p.seatNo === fixed.seatNo);
+    const coord = resolveSeatRowCol(room, fixed.seatNo, fixed.seatGroup, fixed.isMoveStudent)
+      || (fixed.row && fixed.col ? { row: fixed.row, col: fixed.col } : null)
+      || positions.find(p => p.seatNo === fixed.seatNo);
     if (!coord) return;
     seatByCoord[`${coord.row}-${coord.col}`] = {
       ...fixed,
@@ -673,6 +673,25 @@ function getSplitSeatCapacities(rows, cols, moveMode = 'even') {
     total: generateGroupColumnPositions(rows, cols, home).length
       + generateGroupColumnPositions(rows, cols, move).length
   };
+}
+
+function resolveSeatRowCol(roomName, seatNo, seatGroup, isMoveStudent) {
+  const seatConfig = getSeatConfig();
+  const num = parseInt(seatNo, 10);
+  if (!roomName || !Number.isFinite(num) || num < 1) return null;
+
+  if (usesSplitColumnLayout(roomName)) {
+    const moveMode = normalizeMoveColumnMode(seatConfig.moveStudentColumnMode);
+    const isMove = seatGroup === 'move' || isMoveStudent;
+    const parity = isMove ? moveMode : getHomeColumnMode(moveMode);
+    const pos = generateGroupColumnPositions(seatConfig.rows, seatConfig.cols, parity)
+      .find(p => p.seatNo === num);
+    return pos ? { row: pos.row, col: pos.col } : null;
+  }
+
+  const pos = generateSeatPositions(seatConfig.rows, seatConfig.cols, seatConfig.fillDirection)
+    .find(p => p.seatNo === num);
+  return pos ? { row: pos.row, col: pos.col } : null;
 }
 
 function assignSeatsSplitByColumn(roomName, studentIds, seatConfig) {
@@ -2079,23 +2098,28 @@ function getEffectivePlacement(studentId, day, period) {
   const baseNote = appState.attendanceNotes[noteKey] || '';
   const attendanceType = ov.attendanceType ?? inferAttendanceType(baseNote);
   const memo = ov.memo !== undefined ? ov.memo : (attendanceType === '정상' ? baseNote : '');
+  const roomName = ov.roomName ?? base.roomName;
+  const seatNo = ov.seatNo ?? base.seatNo;
+  const seatGroup = base.seatGroup || (base.isMoveStudent ? 'move' : 'home');
+  const coord = resolveSeatRowCol(roomName, seatNo, seatGroup, base.isMoveStudent);
   return {
     studentId,
     grade: base.grade,
     day,
     period,
     subject: base.subject,
-    roomName: ov.roomName ?? base.roomName,
-    seatNo: ov.seatNo ?? base.seatNo,
+    roomName,
+    seatNo,
     attendanceType,
     memo,
     note: buildAttendanceNote(attendanceType, memo),
     name: st?.name || '',
     homeClass: st ? `${st.grade}-${st.classNo}` : '',
     number: st?.number ?? '',
-    row: base.row,
-    col: base.col,
-    isMoveStudent: base.isMoveStudent
+    row: coord?.row ?? base.row,
+    col: coord?.col ?? base.col,
+    isMoveStudent: base.isMoveStudent,
+    seatGroup
   };
 }
 
@@ -2121,15 +2145,36 @@ function setPlacementOverride(studentId, day, period, patch) {
   syncStateToWindow();
 }
 
+function reconcileFixedSeatCoords() {
+  if (!hasFixedRoomSeats()) return;
+  let changed = false;
+  Object.values(appState.fixedRoomSeats).forEach(fs => {
+    const coord = resolveSeatRowCol(fs.roomName, fs.seatNo, fs.seatGroup, fs.isMoveStudent);
+    if (coord && (fs.row !== coord.row || fs.col !== coord.col)) {
+      fs.row = coord.row;
+      fs.col = coord.col;
+      changed = true;
+    }
+  });
+  if (changed) {
+    rebuildSeatAssignmentsFromFixed();
+    syncDerivedRoomAssignments();
+  }
+}
+
 function syncPlacementToSources(studentId, day, period) {
   const eff = getEffectivePlacement(studentId, day, period);
   if (!eff) return;
+
+  const seatNo = parseInt(eff.seatNo, 10);
+  const coord = resolveSeatRowCol(eff.roomName, seatNo, eff.seatGroup, eff.isMoveStudent);
 
   if (appState.fixedRoomSeats[studentId]) {
     appState.fixedRoomSeats[studentId] = {
       ...appState.fixedRoomSeats[studentId],
       roomName: eff.roomName,
-      seatNo: parseInt(eff.seatNo, 10) || appState.fixedRoomSeats[studentId].seatNo
+      seatNo: Number.isFinite(seatNo) ? seatNo : appState.fixedRoomSeats[studentId].seatNo,
+      ...(coord ? { row: coord.row, col: coord.col } : {})
     };
     rebuildSeatAssignmentsFromFixed();
     syncDerivedRoomAssignments();
@@ -2141,7 +2186,8 @@ function syncPlacementToSources(studentId, day, period) {
         arr[idx] = {
           ...arr[idx],
           roomName: eff.roomName,
-          seatNo: parseInt(eff.seatNo, 10) || arr[idx].seatNo
+          seatNo: Number.isFinite(seatNo) ? seatNo : arr[idx].seatNo,
+          ...(coord ? { row: coord.row, col: coord.col } : {})
         };
       }
     }
@@ -3092,6 +3138,7 @@ function applyBulkPlacementChanges() {
   renderPlacementValidationBanner();
   renderPlacementChangeHistory();
   renderOutputValidationBanner();
+  if ($('#step-5')?.classList.contains('active')) refreshOutputPreview();
 }
 
 function assignSeparateRoomToSelected() {
@@ -3108,6 +3155,7 @@ function assignSeparateRoomToSelected() {
   renderPlacementValidationBanner();
   renderPlacementChangeHistory();
   renderOutputValidationBanner();
+  if ($('#step-5')?.classList.contains('active')) refreshOutputPreview();
 }
 
 function applyDefaultPlacementFiltersIfNeeded() {
@@ -3128,6 +3176,7 @@ function initPlacementEditor() {
   bindPlacementFilterDelegation();
   bindPlacementPagerDelegation();
   bindPlacementRoomNav();
+  reconcileFixedSeatCoords();
   renderPlacementFilters();
   applyDefaultPlacementFiltersIfNeeded();
   renderPlacementChangeHistory();
@@ -3167,6 +3216,7 @@ function initPlacementEditorEvents() {
     renderPlacementValidationBanner();
     renderPlacementChangeHistory();
     renderOutputValidationBanner();
+    if ($('#step-5')?.classList.contains('active')) refreshOutputPreview();
   });
 }
 
@@ -3228,32 +3278,100 @@ function formatElectiveStudentNumber(num) {
   return num < 10 ? String(num).padStart(2, '0') : String(num);
 }
 
-function getElectiveStudentsColumns(grade, classNo) {
-  return appState.examGroups
-    .filter(g => g.grade === grade && !isWholeGradeExam(g))
+function getElectiveStudentGradesInRoom(roomName) {
+  if (!roomName) return [];
+  const grades = new Set();
+  Object.keys(appState.seatAssignments).forEach(studentId => {
+    const st = appState.students[studentId];
+    if (!st) return;
+    (appState.seatAssignments[studentId] || []).forEach(seat => {
+      const eff = getEffectivePlacement(studentId, seat.day, seat.period);
+      if (!eff || eff.roomName !== roomName) return;
+      if (!eff.subject || !isElectiveExamForStudent(studentId, seat.day, seat.period, eff.subject)) return;
+      grades.add(st.grade);
+    });
+  });
+  return [...grades].sort((a, b) => a - b);
+}
+
+function getElectiveStudentsColumnsForRoom(roomName, studentGrade) {
+  if (!roomName) return [];
+
+  const slotMap = new Map();
+  Object.keys(appState.seatAssignments).forEach(studentId => {
+    const st = appState.students[studentId];
+    if (!st) return;
+    if (studentGrade != null && st.grade !== studentGrade) return;
+
+    (appState.seatAssignments[studentId] || []).forEach(seat => {
+      const eff = getEffectivePlacement(studentId, seat.day, seat.period);
+      if (!eff || eff.roomName !== roomName) return;
+      if (!eff.subject || !isElectiveExamForStudent(studentId, seat.day, seat.period, eff.subject)) return;
+
+      const key = `${seat.day}-${seat.period}-${eff.subject}`;
+      if (!slotMap.has(key)) {
+        slotMap.set(key, {
+          day: seat.day,
+          period: seat.period,
+          subject: eff.subject,
+          dateLabel: formatDate(seat.day),
+          periodLabel: `${seat.period}교시`,
+          studentIds: new Set()
+        });
+      }
+      slotMap.get(key).studentIds.add(studentId);
+    });
+  });
+
+  return [...slotMap.values()]
     .sort((a, b) => a.day - b.day || a.period - b.period || a.subject.localeCompare(b.subject, 'ko'))
-    .map(g => {
-      const students = g.students
-        .filter(id => {
-          const st = appState.students[id];
-          return st && st.grade === grade && st.classNo === classNo;
-        })
-        .map(id => {
-          const st = appState.students[id];
-          return { number: st.number, name: st.name };
-        })
-        .sort((a, b) => a.number - b.number);
-      if (!students.length) return null;
-      return {
-        day: g.day,
-        period: g.period,
-        subject: g.subject,
-        dateLabel: formatDate(g.day),
-        periodLabel: `${g.period}교시`,
-        students
-      };
-    })
-    .filter(Boolean);
+    .map(slot => ({
+      day: slot.day,
+      period: slot.period,
+      subject: slot.subject,
+      dateLabel: slot.dateLabel,
+      periodLabel: slot.periodLabel,
+      students: sortStudentsByClass([...slot.studentIds]).map(id => {
+        const st = appState.students[id];
+        return { number: st.number, name: st.name };
+      })
+    }))
+    .filter(col => col.students.length > 0);
+}
+
+function getElectiveStudentsSectionsForRoom(roomName) {
+  return getElectiveStudentGradesInRoom(roomName)
+    .map(grade => ({
+      grade,
+      columns: getElectiveStudentsColumnsForRoom(roomName, grade)
+    }))
+    .filter(section => section.columns.length > 0);
+}
+
+/** @deprecated 고사실 기준 API 사용 — getElectiveStudentsColumnsForRoom */
+function getElectiveStudentsColumns(grade, classNo) {
+  return getElectiveStudentsColumnsForRoom(`${grade}-${classNo}`);
+}
+
+function formatElectiveRoomHeader(roomName, studentGrade) {
+  const parsed = parseClassRoomName(roomName);
+  const gradeLine = studentGrade != null ? `${studentGrade}학년 선택과목 응시 학생` : '선택과목 응시 학생';
+  if (parsed) {
+    const isResident = studentGrade === parsed.grade;
+    const audience = studentGrade == null
+      ? '상주·이동 학생 포함'
+      : isResident ? '상주 학생' : `${studentGrade}학년 이동 학생`;
+    return {
+      roomLabel: `[${roomName}반 교실]`,
+      subtitle: `${parsed.grade}학년 ${parsed.classNo}반 고사실 · ${gradeLine}`,
+      roomLine: `시험실: ${roomName} · ${audience}`
+    };
+  }
+  return {
+    roomLabel: `[${roomName}]`,
+    subtitle: `${roomName} · ${gradeLine}`,
+    roomLine: studentGrade != null ? `시험실: ${roomName} · ${studentGrade}학년` : `시험실: ${roomName}`
+  };
 }
 
 function buildElectiveStudentsTableHtml(columns) {
@@ -3301,13 +3419,8 @@ function buildElectiveStudentsTableHtml(columns) {
   return `<table class="doc-table elective-students-table"><thead>${h1}${h2}${h3}</thead><tbody>${body}${foot}</tbody></table>`;
 }
 
-function renderElectiveStudentsPage(grade, classNo) {
-  const columns = getElectiveStudentsColumns(grade, classNo);
-  if (!columns.length) {
-    return `<div class="print-doc print-elective-students"><p class="hint">해당 학급의 선택과목 응시 데이터가 없습니다.</p></div>`;
-  }
-
-  const roomName = `${grade}-${classNo}`;
+function renderElectiveStudentsGradePage(roomName, studentGrade, columns) {
+  const header = formatElectiveRoomHeader(roomName, studentGrade);
   const table = buildElectiveStudentsTableHtml(columns);
 
   return `<div class="print-doc print-elective-students">
@@ -3315,40 +3428,52 @@ function renderElectiveStudentsPage(grade, classNo) {
     <header class="doc-header doc-header-print es-header">
       ${getSchoolNameLine() ? `<p class="doc-school">${getSchoolNameLine()}</p>` : ''}
       <h1>${getExamTitleShort()}</h1>
-      <p class="doc-sub es-subtitle">[${roomName}반 교실] ${grade}학년 ${classNo}반 선택과목 응시 학생</p>
-      <p class="es-room-label">시험실: ${roomName}</p>
+      <p class="doc-sub es-subtitle">${header.roomLabel} ${header.subtitle}</p>
+      <p class="es-room-label">${header.roomLine}</p>
     </header>
     ${table}
   </div>`;
 }
 
+function renderElectiveStudentsPage(roomName) {
+  const sections = getElectiveStudentsSectionsForRoom(roomName);
+  if (!sections.length) {
+    return `<div class="print-doc print-elective-students"><p class="hint">${roomName || '고사실'} · 해당 교실에서 응시하는 선택과목 데이터가 없습니다.</p></div>`;
+  }
+
+  return sections.map(({ grade, columns }) =>
+    renderElectiveStudentsGradePage(roomName, grade, columns)
+  ).join('');
+}
+
 function renderElectiveStudentsDocument(f) {
   if (f.bulkPrint) {
-    const classes = sortClassNos(
-      Object.values(appState.students).filter(s => s.grade === f.grade).map(s => s.classNo)
-    );
-    if (!classes.length) return '<p class="hint">해당 학년 학급이 없습니다.</p>';
-    return `<div class="elective-students-batch">${classes.map(c => renderElectiveStudentsPage(f.grade, c)).join('')}</div>`;
+    const rooms = getOutputRoomNames(f.grade);
+    if (!rooms.length) return '<p class="hint">해당 학년 고사실이 없습니다.</p>';
+    return `<div class="elective-students-batch">${rooms.map(r => renderElectiveStudentsPage(r)).join('')}</div>`;
   }
-  return renderElectiveStudentsPage(f.grade, f.classNo);
+  if (!f.room) return '<p class="hint">고사실을 선택하세요.</p>';
+  return `<div class="elective-students-batch">${renderElectiveStudentsPage(f.room)}</div>`;
+}
+
+function mapPersonalScheduleEntry(studentId, entry) {
+  const eff = getEffectivePlacement(studentId, entry.day, entry.period);
+  return {
+    day: entry.day,
+    date: formatDateShort(entry.day),
+    period: entry.period,
+    subject: eff?.subject ?? entry.subject,
+    room: eff?.roomName || '-',
+    seatNo: eff?.seatNo ?? '-'
+  };
 }
 
 function getPersonalScheduleData(studentId) {
   const st = appState.students[studentId];
   if (!st) return null;
-  const schedule = (appState.studentExamSchedules[studentId] || []).map(entry => {
-    const seat = (appState.seatAssignments[studentId] || []).find(s =>
-      s.day === entry.day && s.period === entry.period && s.subject === entry.subject
-    );
-    return {
-      day: entry.day,
-      date: formatDateShort(entry.day),
-      period: entry.period,
-      subject: entry.subject,
-      room: seat?.roomName || '-',
-      seatNo: seat?.seatNo ?? '-'
-    };
-  }).sort((a, b) => a.day - b.day || a.period - b.period);
+  const schedule = (appState.studentExamSchedules[studentId] || [])
+    .map(entry => mapPersonalScheduleEntry(studentId, entry))
+    .sort((a, b) => a.day - b.day || a.period - b.period);
   return { student: st, schedule };
 }
 
@@ -3399,9 +3524,9 @@ function getSeatDataForSession(grade, day, period, room) {
       if (!eff || eff.roomName !== room) return;
       if (!subject) subject = eff.subject;
       const st = appState.students[studentId];
-      const coord = (eff.row && eff.col)
-        ? { row: eff.row, col: eff.col }
-        : seatNoToCoord[eff.seatNo];
+      const coord = resolveSeatRowCol(eff.roomName, eff.seatNo, eff.seatGroup, eff.isMoveStudent)
+        || (eff.row && eff.col ? { row: eff.row, col: eff.col } : null)
+        || seatNoToCoord[eff.seatNo];
       if (!coord) return;
       seatByCoord[`${coord.row}-${coord.col}`] = {
         ...seat,
@@ -3849,19 +3974,9 @@ function renderPersonalStudentDoc(studentId) {
   const st = appState.students[studentId];
   if (!st) return '';
 
-  const schedule = (appState.studentExamSchedules[studentId] || []).map(entry => {
-    const seat = (appState.seatAssignments[studentId] || []).find(s =>
-      s.day === entry.day && s.period === entry.period && s.subject === entry.subject
-    );
-    return {
-      day: entry.day,
-      date: formatDateShort(entry.day),
-      period: entry.period,
-      subject: entry.subject,
-      room: seat?.roomName || '-',
-      seatNo: seat?.seatNo ?? '-'
-    };
-  }).sort((a, b) => a.day - b.day || a.period - b.period);
+  const schedule = (appState.studentExamSchedules[studentId] || [])
+    .map(entry => mapPersonalScheduleEntry(studentId, entry))
+    .sort((a, b) => a.day - b.day || a.period - b.period);
 
   let table = `<table class="doc-table"><thead><tr>
     <th>일차</th><th>날짜</th><th>교시</th><th>과목</th><th>시험실</th><th>좌석</th>
@@ -4124,7 +4239,7 @@ function refreshOutputFilters() {
     : ['grade', 'day', 'period', 'room'];
   renderFilterGroup('filters-seat-map', [...seatMapFields, 'bulkPrint']);
   renderFilterGroup('filters-attendance', ['day', 'room', 'bulkPrint']);
-  renderFilterGroup('filters-elective-students', ['grade', 'class', 'bulkPrint']);
+  renderFilterGroup('filters-elective-students', ['grade', 'room', 'bulkPrint']);
   renderFilterGroup('filters-personal', ['grade', 'class', 'student', 'bulkPrint']);
   renderFilterGroup('filters-room-assignment', ['grade', 'day', 'class', 'bulkPrint']);
 }
@@ -4457,6 +4572,7 @@ function fitOutputPreviewToPage() {
 }
 
 function refreshOutputPreview() {
+  reconcileFixedSeatCoords();
   renderOperationDashboard();
   if (Object.keys(appState.students).length) {
     appState._lastDiagnosis = runOperationDiagnosis();
@@ -4512,7 +4628,7 @@ function initStep5Output() {
       if (container.querySelector('.filter-room')) updateOutputRoomFilter(container);
       if (container.querySelector('.filter-class')) updatePersonalFilters(container);
     }
-    if (container.id === 'filters-personal' || container.id === 'filters-room-assignment' || container.id === 'filters-elective-students') {
+    if (container.id === 'filters-personal' || container.id === 'filters-room-assignment') {
       updatePersonalFilters(container);
     }
     refreshOutputPreview();
@@ -5063,6 +5179,10 @@ window.examFlowExportApi = {
   getSplitSeatLabelAtCoord,
   getExamTitleShort,
   getElectiveStudentsColumns,
+  getElectiveStudentsColumnsForRoom,
+  getElectiveStudentsSectionsForRoom,
+  formatElectiveRoomHeader,
+  getOutputRoomNames,
   buildElectiveStudentsTableHtml,
   formatElectiveStudentNumber,
   getPersonalScheduleData,

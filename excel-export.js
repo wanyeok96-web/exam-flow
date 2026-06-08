@@ -311,38 +311,38 @@ const ExamFlowExcel = (function () {
 
   /* ---------- 선택과목 응시 학생 ---------- */
 
-  function buildElectiveStudentsSheet(grade, classNo) {
-    const columns = api().getElectiveStudentsColumns(grade, classNo);
-    if (!columns.length) return null;
+  function buildElectiveStudentsSheet(roomName, studentGrade, columns) {
+    const cols = columns || api().getElectiveStudentsColumnsForRoom(roomName, studentGrade);
+    if (!cols.length) return null;
 
-    const colCount = 1 + columns.length * 2;
+    const colCount = 1 + cols.length * 2;
     const ws = {};
-    const roomName = `${grade}-${classNo}`;
+    const header = api().formatElectiveRoomHeader(roomName, studentGrade);
     let row = applySchoolHeader(ws, 0, colCount, [
       api().getExamTitleShort(),
-      `[${roomName}반 교실] ${grade}학년 ${classNo}반 선택과목 응시 학생`,
-      `시험실: ${roomName}`
+      `${header.roomLabel} ${header.subtitle}`,
+      header.roomLine
     ]);
     row++;
 
     const headerStart = row;
     setCell(ws, headerStart, 0, '순', STYLE_HEADER);
     addMerge(ws, headerStart, 0, headerStart + 2, 0);
-    for (let i = 0; i < columns.length;) {
-      const day = columns[i].day;
+    for (let i = 0; i < cols.length;) {
+      const day = cols[i].day;
       let count = 0;
-      while (i + count < columns.length && columns[i + count].day === day) count++;
-      setCell(ws, headerStart, 1 + i * 2, columns[i].dateLabel, STYLE_HEADER);
+      while (i + count < cols.length && cols[i + count].day === day) count++;
+      setCell(ws, headerStart, 1 + i * 2, cols[i].dateLabel, STYLE_HEADER);
       addMerge(ws, headerStart, 1 + i * 2, headerStart, 1 + (i + count) * 2 - 1);
       i += count;
     }
 
-    columns.forEach((col, idx) => {
+    cols.forEach((col, idx) => {
       setCell(ws, headerStart + 1, 1 + idx * 2, col.periodLabel, STYLE_HEADER);
       addMerge(ws, headerStart + 1, 1 + idx * 2, headerStart + 1, 1 + idx * 2 + 1);
     });
 
-    columns.forEach((col, idx) => {
+    cols.forEach((col, idx) => {
       setCell(ws, headerStart + 2, 1 + idx * 2, col.subject, STYLE_HEADER);
       addMerge(ws, headerStart + 2, 1 + idx * 2, headerStart + 2, 1 + idx * 2 + 1);
     });
@@ -354,7 +354,7 @@ const ExamFlowExcel = (function () {
     const maxRows = 20;
     for (let r = 0; r < maxRows; r++) {
       setCell(ws, row, 0, r + 1, STYLE_DATA);
-      columns.forEach((col, idx) => {
+      cols.forEach((col, idx) => {
         const st = col.students[r];
         setCell(ws, row, 1 + idx * 2, st ? api().formatElectiveStudentNumber(st.number) : '', STYLE_DATA);
         setCell(ws, row, 1 + idx * 2 + 1, st ? st.name : '', STYLE_DATA);
@@ -363,7 +363,7 @@ const ExamFlowExcel = (function () {
     }
 
     setCell(ws, row, 0, '계', STYLE_HEADER);
-    columns.forEach((col, idx) => {
+    cols.forEach((col, idx) => {
       setCell(ws, row, 1 + idx * 2, `${col.students.length} 명`, STYLE_DATA);
       addMerge(ws, row, 1 + idx * 2, row, 1 + idx * 2 + 1);
     });
@@ -373,24 +373,29 @@ const ExamFlowExcel = (function () {
     return ws;
   }
 
+  function electiveSheetName(roomName, studentGrade) {
+    return sanitizeSheetName(`${roomName}_${studentGrade}학`);
+  }
+
   function exportElectiveStudentsExcel(f) {
     if (!validateExport()) return;
-    const { grade, classNo, classAll, bulkPrint } = f;
-    const classes = (classAll || bulkPrint)
-      ? [...new Set(Object.values(window.examFlowState.students).filter(s => s.grade === grade).map(s => s.classNo))].sort((a, b) => a - b)
-      : [classNo];
-    if (!classes.length) { alert('해당 학년 학급이 없습니다.'); return; }
+    const { grade, room, bulkPrint } = f;
+    const rooms = bulkPrint ? api().getOutputRoomNames(grade) : [room];
+    if (!rooms.length) { alert('고사실을 선택하세요.'); return; }
 
     const wb = createWorkbook();
     let added = 0;
-    classes.forEach(c => {
-      const ws = buildElectiveStudentsSheet(grade, c);
-      if (!ws) return;
-      XLSX.utils.book_append_sheet(wb, ws, sanitizeSheetName(`${grade}-${c}`));
-      added++;
+    rooms.forEach(rm => {
+      const sections = api().getElectiveStudentsSectionsForRoom(rm);
+      sections.forEach(({ grade: studentGrade, columns }) => {
+        const ws = buildElectiveStudentsSheet(rm, studentGrade, columns);
+        if (!ws) return;
+        XLSX.utils.book_append_sheet(wb, ws, electiveSheetName(rm, studentGrade));
+        added++;
+      });
     });
-    if (!added) { alert('해당 학급의 선택과목 응시 데이터가 없습니다.'); return; }
-    const suffix = (classAll || bulkPrint) ? `${grade}학년_전체반` : `${grade}학년${classNo}반`;
+    if (!added) { alert('해당 고사실의 선택과목 응시 데이터가 없습니다.'); return; }
+    const suffix = bulkPrint ? `${grade}학년_전체고사실` : room;
     downloadWorkbook(wb, `선택과목응시학생_${examMetaSlug()}_${suffix}.xlsx`);
   }
 
