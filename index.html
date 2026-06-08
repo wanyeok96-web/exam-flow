@@ -197,6 +197,7 @@
       <div class="card section-card">
         <h2 class="card__title"><span class="card-icon" aria-hidden="true">📤</span> 나이스 학생편성현황 업로드</h2>
         <p class="hint">나이스에서 다운로드한 학생편성현황 엑셀 파일을 학년별로 업로드하세요. 파일은 브라우저에서만 파싱됩니다.</p>
+        <p class="hint"><strong>다운로드 경로:</strong> 나이스 → 시간표 → 편제및과목개설관리 → 수강생편성 → 학년설정 후 조회 → 학생편성현황 → 엑셀출력 → 엑셀파일 다운로드</p>
         <p class="hint">성명 앞에 (미재학)이 붙은 학생은 현재 재학생이 아니므로 자동 제외됩니다.</p>
         <div class="upload-grid">
           <div class="upload-box">
@@ -272,8 +273,8 @@
 
       <div class="card section-card">
         <h2 class="card__title"><span class="card-icon" aria-hidden="true">🪑</span> 고정 좌석 부여</h2>
-        <p class="hint">교실별 상주 학생에게 좌석을 1회 부여합니다. 시험 기간 전체 동일 좌석이 유지되며, 교시별 과목만 연결됩니다.</p>
-        <button type="button" id="btn-assign-seats" class="btn btn-primary">고정 좌석 배정</button>
+        <p class="hint">교실별 상주 학생에게 좌석을 1회 부여합니다. 시험 일정 생성·페이지 불러오기 시 <strong>자동 배정</strong>되며, 필요할 때만 아래 버튼으로 재배정하세요.</p>
+        <button type="button" id="btn-assign-seats" class="btn btn-secondary">고정 좌석 재배정</button>
         <div id="seat-assign-result" class="info-box hidden"></div>
       </div>
     </section>
@@ -390,6 +391,7 @@
                 <h3><span class="output-card-icon" aria-hidden="true">🪑</span> 좌석배치도 <span class="export-badge export-ready">✅ Excel</span></h3>
                 <div class="output-card-actions">
                   <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="seat-map">인쇄</button>
+                  <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="seat-map">전체 PDF</button>
                   <button type="button" class="btn btn-sm btn-secondary btn-excel-export" data-output="seat-map">엑셀</button>
                 </div>
               </div>
@@ -402,6 +404,7 @@
                 <h3><span class="output-card-icon" aria-hidden="true">📋</span> 응시현황표 <span class="export-badge export-ready">✅ Excel</span></h3>
                 <div class="output-card-actions">
                   <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="attendance">인쇄</button>
+                  <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="attendance">전체 PDF</button>
                   <button type="button" class="btn btn-sm btn-secondary btn-excel-export" data-output="attendance">엑셀</button>
                 </div>
               </div>
@@ -414,6 +417,7 @@
                 <h3><span class="output-card-icon" aria-hidden="true">📌</span> 선택과목 응시 학생 <span class="export-badge export-ready">✅ Excel</span></h3>
                 <div class="output-card-actions">
                   <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="elective-students">인쇄</button>
+                  <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="elective-students">전체 PDF</button>
                   <button type="button" class="btn btn-sm btn-secondary btn-excel-export" data-output="elective-students">엑셀</button>
                 </div>
               </div>
@@ -426,6 +430,7 @@
                 <h3><span class="output-card-icon" aria-hidden="true">📅</span> 학생 개인별 시험시간표 <span class="export-badge export-ready">✅ Excel</span></h3>
                 <div class="output-card-actions">
                   <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="personal">인쇄</button>
+                  <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="personal">전체 PDF</button>
                   <button type="button" class="btn btn-sm btn-secondary btn-excel-export" data-output="personal">엑셀</button>
                 </div>
               </div>
@@ -438,6 +443,7 @@
                 <h3><span class="output-card-icon" aria-hidden="true">🏫</span> 시험실배정현황 <span class="export-badge export-ready">✅ Excel</span></h3>
                 <div class="output-card-actions">
                   <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="room-assignment">인쇄</button>
+                  <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="room-assignment">전체 PDF</button>
                   <button type="button" class="btn btn-sm btn-secondary btn-excel-export" data-output="room-assignment">엑셀</button>
                 </div>
               </div>

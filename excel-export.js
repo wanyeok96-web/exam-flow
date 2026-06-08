@@ -379,8 +379,8 @@ const ExamFlowExcel = (function () {
 
   function exportElectiveStudentsExcel(f) {
     if (!validateExport()) return;
-    const { grade, room, bulkPrint } = f;
-    const rooms = bulkPrint ? api().getOutputRoomNames(grade) : [room];
+    const { room, bulkPrint } = f;
+    const rooms = bulkPrint ? api().getOutputRoomNames() : [room];
     if (!rooms.length) { alert('고사실을 선택하세요.'); return; }
 
     const wb = createWorkbook();
@@ -395,7 +395,7 @@ const ExamFlowExcel = (function () {
       });
     });
     if (!added) { alert('해당 고사실의 선택과목 응시 데이터가 없습니다.'); return; }
-    const suffix = bulkPrint ? `${grade}학년_전체고사실` : room;
+    const suffix = bulkPrint ? '전체고사실' : room;
     downloadWorkbook(wb, `선택과목응시학생_${examMetaSlug()}_${suffix}.xlsx`);
   }
 

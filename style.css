@@ -1701,6 +1701,17 @@ input:focus, select:focus, textarea:focus {
   table-layout: fixed;
 }
 
+.output-preview .print-elective-students .elective-students-table th,
+.output-preview .print-elective-students .elective-students-table td {
+  padding: 0.22rem 0.15rem;
+  line-height: 1.35;
+}
+
+.output-preview .print-elective-students .elective-students-table tbody td {
+  padding-top: 0.28rem;
+  padding-bottom: 0.28rem;
+}
+
 .output-preview .print-elective-students .es-col-order { width: 2rem; }
 .output-preview .print-elective-students .es-col-num { width: 2.5rem; }
 .output-preview .print-elective-students .es-col-name { width: 4rem; }
