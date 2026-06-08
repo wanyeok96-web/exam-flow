@@ -71,6 +71,32 @@ body {
 
 /* ========== Hero (클래스매이트 스타일) ========== */
 
+.hero-copyright {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem 0.55rem;
+  margin: 0 0 12px;
+  text-align: right;
+  font-size: 0.72rem;
+  font-weight: 600;
+  line-height: 1.45;
+  letter-spacing: -0.02em;
+  color: var(--text-secondary);
+  word-break: keep-all;
+  opacity: 0.95;
+}
+
+.hero-copyright__sep {
+  display: inline-block;
+  width: 1px;
+  height: 0.85em;
+  background: currentColor;
+  opacity: 0.35;
+  flex-shrink: 0;
+}
+
 .hero {
   position: relative;
   text-align: center;
