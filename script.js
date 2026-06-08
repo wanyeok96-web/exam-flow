@@ -185,12 +185,12 @@ function parseClassRoomName(roomName) {
 }
 
 function compareClassNos(a, b) {
-  return a - b;
+  return Number(a) - Number(b);
 }
 
 function compareGradeClass(gradeA, classA, gradeB, classB) {
-  if (gradeA !== gradeB) return gradeA - classB;
-  return classA - classB;
+  if (gradeA !== gradeB) return gradeA - gradeB;
+  return Number(classA) - Number(classB);
 }
 
 function compareClassRoomNames(a, b) {
@@ -207,7 +207,49 @@ function sortClassRoomNames(names) {
 }
 
 function sortClassNos(classNos) {
-  return [...new Set(classNos)].sort(compareClassNos);
+  return [...new Set(classNos.map(n => Number(n)).filter(n => Number.isFinite(n)))].sort(compareClassNos);
+}
+
+function getOrderedClassNosForGrade(grade) {
+  const classNos = new Set();
+  getClassRooms().forEach(r => {
+    const parsed = parseClassRoomName(r.name);
+    if (parsed && parsed.grade === grade) classNos.add(parsed.classNo);
+  });
+  Object.values(appState.students).forEach(s => {
+    if (s.grade === grade) classNos.add(s.classNo);
+  });
+  return sortClassNos([...classNos]);
+}
+
+/** 출력 탭 고사실 목록 — 학년·반(1~12) 숫자 순 */
+function getOutputRoomNames(grade) {
+  const classNames = getClassRooms()
+    .map(r => r.name)
+    .filter(name => {
+      if (!grade) return true;
+      const parsed = parseClassRoomName(name);
+      return parsed && parsed.grade === grade;
+    });
+  const sortedClass = sortClassRoomNames(classNames);
+  if (grade) return sortedClass;
+  const others = appState.rooms
+    .filter(r => r.type !== 'class')
+    .map(r => r.name)
+    .sort((a, b) => String(a).localeCompare(String(b), 'ko'));
+  return [...sortedClass, ...others];
+}
+
+function updateOutputRoomFilter(container) {
+  const roomSel = container?.querySelector('.filter-room');
+  if (!roomSel) return;
+  const gradeSel = container.querySelector('.filter-grade');
+  const grade = gradeSel ? parseInt(gradeSel.value, 10) : null;
+  const prev = roomSel.value;
+  const rooms = getOutputRoomNames(Number.isFinite(grade) ? grade : null);
+  roomSel.innerHTML = rooms.map(r => `<option value="${r}">${r}</option>`).join('');
+  if (prev && rooms.includes(prev)) roomSel.value = prev;
+  else if (rooms.length) roomSel.value = rooms[0];
 }
 
 function compareRooms(a, b) {
@@ -3703,12 +3745,14 @@ function getMoveStudentColumns(seatByCoord) {
 
 function getSeatMapBulkRooms(f) {
   if (hasFixedRoomSeats()) {
-    return getClassRooms()
-      .map(r => r.name)
-      .filter(name => {
-        const p = parseClassRoomName(name);
-        return !f.grade || (p && p.grade === f.grade);
-      });
+    return sortClassRoomNames(
+      getClassRooms()
+        .map(r => r.name)
+        .filter(name => {
+          const p = parseClassRoomName(name);
+          return !f.grade || (p && p.grade === f.grade);
+        })
+    );
   }
   return getRoomsForSession(f.grade, f.day, f.period);
 }
@@ -4092,7 +4136,6 @@ function renderFilterGroup(containerId, fields) {
   const grades = [1, 2, 3];
   const days = Array.from({ length: appState.examMeta.days }, (_, i) => i + 1);
   const periods = Array.from({ length: appState.examMeta.periodsPerDay }, (_, i) => i + 1);
-  const rooms = getSortedRoomNames();
   const subjects = [...new Set(appState.examGroups.map(g => g.subject))].sort();
 
   let html = '';
@@ -4107,7 +4150,7 @@ function renderFilterGroup(containerId, fields) {
     html += `<label>교시 <select class="filter-period">${periods.map(p => `<option value="${p}">${p}교시</option>`).join('')}</select></label>`;
   }
   if (fields.includes('room')) {
-    html += `<label>고사실 <select class="filter-room">${rooms.map(r => `<option value="${r}">${r}</option>`).join('')}</select></label>`;
+    html += `<label>고사실 <select class="filter-room"></select></label>`;
   }
   if (fields.includes('class')) {
     html += `<label>반 <select class="filter-class"></select></label>`;
@@ -4126,6 +4169,9 @@ function renderFilterGroup(containerId, fields) {
   if (fields.includes('class')) {
     updatePersonalFilters(container);
   }
+  if (fields.includes('room')) {
+    updateOutputRoomFilter(container);
+  }
 }
 
 function updatePersonalFilters(container) {
@@ -4135,9 +4181,7 @@ function updatePersonalFilters(container) {
   const bulkPrint = container.querySelector('.filter-bulk-print');
   if (!classSel) return;
 
-  const classes = sortClassNos(
-    Object.values(appState.students).filter(s => s.grade === grade).map(s => s.classNo)
-  );
+  const classes = getOrderedClassNosForGrade(grade);
 
   const prevClass = classSel.value;
   classSel.innerHTML = classes.map(c => `<option value="${c}">${c}반</option>`).join('');
@@ -4464,6 +4508,10 @@ function initStep5Output() {
   $('#output-work-card')?.addEventListener('change', e => {
     const container = e.target.closest('.output-filters');
     if (!container) return;
+    if (e.target.classList.contains('filter-grade')) {
+      if (container.querySelector('.filter-room')) updateOutputRoomFilter(container);
+      if (container.querySelector('.filter-class')) updatePersonalFilters(container);
+    }
     if (container.id === 'filters-personal' || container.id === 'filters-room-assignment' || container.id === 'filters-elective-students') {
       updatePersonalFilters(container);
     }
