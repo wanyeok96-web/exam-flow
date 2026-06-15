@@ -118,7 +118,7 @@
     <section id="step-1" class="step-panel tab-panel active">
       <div class="card section-card">
         <h2 class="card__title"><span class="card-icon" aria-hidden="true">🏫</span> 학교 정보</h2>
-        <p class="hint">출력물·엑셀 상단에 학교명이 표시됩니다. 학년도·학기는 아래 시험 기본 정보를 따릅니다.</p>
+        <p class="hint">출력물 상단에 학교명이 표시됩니다. 학년도·학기는 아래 시험 기본 정보를 따릅니다.</p>
         <div class="form-grid">
           <label class="span-2">학교명 <input type="text" id="meta-school-name" placeholder="예: 이솔고등학교"></label>
         </div>
@@ -346,7 +346,6 @@
           <section class="operation-overview-section operation-dashboard" id="operation-dashboard">
             <div class="operation-dashboard-header">
               <h2 class="card__title"><span class="card-icon" aria-hidden="true">📊</span> 시험 운영 현황</h2>
-              <button type="button" id="btn-export-dashboard" class="btn btn-sm btn-secondary">운영요약 다운로드</button>
             </div>
             <div id="operation-dashboard-stats" class="operation-dashboard-stats"></div>
           </section>
@@ -384,7 +383,7 @@
       <div class="card section-card output-work-card output-work--indexed" id="output-work-card">
         <div class="output-index-row" role="tablist" aria-label="출력물 선택">
           <button type="button" class="output-index-tab is-active" role="tab" data-output="seat-map" aria-selected="true" aria-controls="output-panel-seat-map">좌석배치도</button>
-          <button type="button" class="output-index-tab" role="tab" data-output="attendance" aria-selected="false" aria-controls="output-panel-attendance">응시현황표</button>
+          <button type="button" class="output-index-tab" role="tab" data-output="attendance" aria-selected="false" aria-controls="output-panel-attendance">결시현황표</button>
           <button type="button" class="output-index-tab" role="tab" data-output="elective-students" aria-selected="false" aria-controls="output-panel-elective-students">선택과목</button>
           <button type="button" class="output-index-tab" role="tab" data-output="personal" aria-selected="false" aria-controls="output-panel-personal">개인시간표</button>
           <button type="button" class="output-index-tab" role="tab" data-output="room-assignment" aria-selected="false" aria-controls="output-panel-room-assignment">시험실배정</button>
@@ -394,24 +393,22 @@
           <div class="output-tab-body">
             <div class="output-tab-panel active" id="output-panel-seat-map" data-output="seat-map" role="tabpanel">
               <div class="output-tab-head">
-                <h3><span class="output-card-icon" aria-hidden="true">🪑</span> 좌석배치도 <span class="export-badge export-ready">✅ Excel</span></h3>
+                <h3><span class="output-card-icon" aria-hidden="true">🪑</span> 좌석배치도</h3>
                 <div class="output-card-actions">
                   <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="seat-map">인쇄</button>
                   <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="seat-map">전체 PDF</button>
-                  <button type="button" class="btn btn-sm btn-secondary btn-excel-export" data-output="seat-map">엑셀</button>
                 </div>
               </div>
-              <p class="output-desc">교실별 고정 좌석 배치를 출력합니다. (시험 기간 동일)</p>
+              <p class="output-desc">교실별 고정 좌석 배치를 출력합니다. 칠판 부착용(교탁·앞쪽 상단)과 교탁 부착용(감독관 시점, 상하·좌우 반전) 중 선택할 수 있습니다.</p>
               <div class="output-filters" id="filters-seat-map"></div>
             </div>
 
             <div class="output-tab-panel" id="output-panel-attendance" data-output="attendance" role="tabpanel" hidden>
               <div class="output-tab-head">
-                <h3><span class="output-card-icon" aria-hidden="true">📋</span> 응시현황표 <span class="export-badge export-ready">✅ Excel</span></h3>
+                <h3><span class="output-card-icon" aria-hidden="true">📋</span> 결시현황표</h3>
                 <div class="output-card-actions">
                   <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="attendance">인쇄</button>
                   <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="attendance">전체 PDF</button>
-                  <button type="button" class="btn btn-sm btn-secondary btn-excel-export" data-output="attendance">엑셀</button>
                 </div>
               </div>
               <p class="output-desc">교실·일차별 통합 응시현황표 (학급 구분, 교시별 응시현황)를 출력합니다.</p>
@@ -420,11 +417,10 @@
 
             <div class="output-tab-panel" id="output-panel-elective-students" data-output="elective-students" role="tabpanel" hidden>
               <div class="output-tab-head">
-                <h3><span class="output-card-icon" aria-hidden="true">📌</span> 선택과목 응시 학생 <span class="export-badge export-ready">✅ Excel</span></h3>
+                <h3><span class="output-card-icon" aria-hidden="true">📌</span> 선택과목 응시 학생</h3>
                 <div class="output-card-actions">
                   <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="elective-students">인쇄</button>
                   <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="elective-students">전체 PDF</button>
-                  <button type="button" class="btn btn-sm btn-secondary btn-excel-export" data-output="elective-students">엑셀</button>
                 </div>
               </div>
               <p class="output-desc">고사실별·학년별·일차·교시·과목별 선택과목 응시 학생 명단 — 이동 학생이 있는 고사실은 학년마다 별도 표 (B4 가로, 교실 부착용)</p>
@@ -433,24 +429,22 @@
 
             <div class="output-tab-panel" id="output-panel-personal" data-output="personal" role="tabpanel" hidden>
               <div class="output-tab-head">
-                <h3><span class="output-card-icon" aria-hidden="true">📅</span> 학생 개인별 시험시간표 <span class="export-badge export-ready">✅ Excel</span></h3>
+                <h3><span class="output-card-icon" aria-hidden="true">📅</span> 학생 개인별 시험시간표</h3>
                 <div class="output-card-actions">
                   <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="personal">인쇄</button>
                   <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="personal">전체 PDF</button>
-                  <button type="button" class="btn btn-sm btn-secondary btn-excel-export" data-output="personal">엑셀</button>
                 </div>
               </div>
-              <p class="output-desc">학생 배부용 개인 시간표를 출력합니다.</p>
+              <p class="output-desc">고사실별 개인별 시험 시간표 게시용 — 학번·이름·일차·교시별 과목 (이동/고정 구분, B4 가로, 교실 부착용)</p>
               <div class="output-filters" id="filters-personal"></div>
             </div>
 
             <div class="output-tab-panel" id="output-panel-room-assignment" data-output="room-assignment" role="tabpanel" hidden>
               <div class="output-tab-head">
-                <h3><span class="output-card-icon" aria-hidden="true">🏫</span> 시험실배정현황 <span class="export-badge export-ready">✅ Excel</span></h3>
+                <h3><span class="output-card-icon" aria-hidden="true">🏫</span> 시험실배정현황</h3>
                 <div class="output-card-actions">
                   <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="room-assignment">인쇄</button>
                   <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="room-assignment">전체 PDF</button>
-                  <button type="button" class="btn btn-sm btn-secondary btn-excel-export" data-output="room-assignment">엑셀</button>
                 </div>
               </div>
               <p class="output-desc">학급별 시험실 배정을 출력합니다.</p>
@@ -470,7 +464,6 @@
                     <option value="b4-landscape">B4 가로</option>
                   </select>
                 </label>
-                <button type="button" id="btn-export-excel" class="btn btn-secondary">엑셀보내기</button>
                 <button type="button" id="btn-print-output" class="btn btn-primary">인쇄</button>
               </div>
             </div>
@@ -489,7 +482,6 @@
   </div>
 
   <script src="script.js"></script>
-  <script src="excel-export.js"></script>
   <script src="ui-present.js"></script>
 </body>
 </html>

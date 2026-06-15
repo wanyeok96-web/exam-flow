@@ -1742,6 +1742,92 @@ input:focus, select:focus, textarea:focus {
 .output-preview .print-elective-students .es-col-num { width: 2.5rem; }
 .output-preview .print-elective-students .es-col-name { width: 4rem; }
 
+.output-preview .print-personal-board {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+.output-preview .print-personal-board.personal-board-fit-applied {
+  overflow: hidden;
+}
+
+.output-preview .print-personal-board.personal-board-fit-applied .personal-board-table tbody td {
+  height: var(--pb-data-row-mm, 6.5mm) !important;
+  max-height: var(--pb-data-row-mm, 6.5mm) !important;
+  min-height: 0;
+  padding: clamp(0.5mm, calc(var(--pb-data-row-mm, 6.5mm) * 0.14), 1.2mm) 0.08rem;
+  overflow: hidden;
+  line-height: 1.22;
+  box-sizing: border-box;
+}
+
+.output-preview .print-personal-board.personal-board-fit-applied:not(.personal-board-compact) .personal-board-table {
+  font-size: 0.62rem;
+}
+
+.output-preview .print-personal-board.personal-board-fit-applied:not(.personal-board-compact) .pb-subject {
+  font-size: 0.58rem;
+}
+
+.output-preview .print-personal-board.personal-board-fit-applied.personal-board-compact .personal-board-table tbody td {
+  padding: clamp(0.15mm, calc(var(--pb-data-row-mm) * 0.1), 0.55mm) 0.06rem;
+  line-height: 1.1;
+}
+
+.output-preview .print-personal-board.personal-board-fit-applied.personal-board-compact .pb-subject {
+  font-size: clamp(5.5pt, calc(var(--pb-data-row-mm) * 0.46), 7pt);
+}
+
+.output-preview .print-personal-board.personal-board-fit-applied.personal-board-compact .personal-board-table {
+  font-size: clamp(6pt, calc(var(--pb-data-row-mm) * 0.52), 8pt);
+}
+
+.output-preview .print-personal-board .pb-header {
+  text-align: center;
+  border-bottom: none;
+  margin-bottom: 8px;
+}
+
+.output-preview .print-personal-board .pb-subtitle {
+  font-size: 0.92rem;
+  font-weight: 700;
+  margin: 0.15rem 0 0;
+}
+
+.output-preview .personal-board-table {
+  font-size: 0.68rem;
+  table-layout: fixed;
+  width: 100%;
+}
+
+.output-preview .personal-board-table th,
+.output-preview .personal-board-table td {
+  padding: 0.22rem 0.12rem;
+  line-height: 1.35;
+  text-align: center;
+  word-break: keep-all;
+}
+
+.output-preview .personal-board-table .pb-col-id { width: 3.2rem; }
+.output-preview .personal-board-table .pb-col-name { width: 3.6rem; }
+.output-preview .personal-board-table .pb-subject { font-size: 0.65rem; }
+.output-preview .personal-board-table .pb-side-label {
+  width: 1.6rem;
+  writing-mode: vertical-rl;
+  text-orientation: mixed;
+  letter-spacing: 0.2em;
+  font-weight: 700;
+  font-size: 0.72rem;
+}
+.output-preview .personal-board-table .pb-side-head { width: 1.6rem; }
+
+.output-preview .pb-footer-note {
+  margin-top: 8px;
+  font-size: 0.68rem;
+  color: var(--text-secondary);
+  text-align: left;
+}
+
 .output-preview .print-attendance-matrix {
   overflow: hidden;
   max-width: 210mm;
@@ -1942,15 +2028,6 @@ input:focus, select:focus, textarea:focus {
   line-height: 1.35;
   letter-spacing: 0.02em;
   font-weight: 700;
-}
-
-.export-badge {
-  font-size: 0.62rem;
-  font-weight: 700;
-  padding: 3px 8px;
-  border-radius: 999px;
-  background: #dcfce7;
-  color: #15803d;
 }
 
 .validation-card .validation-ok { color: var(--success); }

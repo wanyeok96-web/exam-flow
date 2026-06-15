@@ -1122,13 +1122,24 @@ function roomTypeLabel(type) {
   return { class: '학급교실', special: '특별실', waiting: '대기실' }[type] || type;
 }
 
+function flushDOMBeforeTimetableRender() {
+  collectMetaFromDOM();
+  collectTimetableFromDOM();
+}
+
+function persistAllSettings() {
+  collectAllSettings();
+  saveToLocalSilent();
+}
+
 function applyExamMeta() {
   if (guardIfLocked('시험 규칙 수정')) return;
-  collectMetaFromDOM();
+  flushDOMBeforeTimetableRender();
   renderExamDates();
   renderUnifiedTimetable();
   refreshOutputFilters();
   syncStateToWindow();
+  persistAllSettings();
 }
 
 function collectMetaFromDOM() {
@@ -1197,6 +1208,7 @@ function saveTimetable() {
   collectTimetableFromDOM();
   alert('시간표가 저장되었습니다.');
   syncStateToWindow();
+  persistAllSettings();
 }
 
 function saveMovementRules() {
@@ -1204,6 +1216,7 @@ function saveMovementRules() {
   collectMovementRulesFromDOM();
   renderMovementPreview();
   syncStateToWindow();
+  persistAllSettings();
 }
 
 function saveSeatDefaults() {
@@ -1211,6 +1224,7 @@ function saveSeatDefaults() {
   collectSeatDefaultsFromDOM();
   renderSeatConfigPreview();
   syncStateToWindow();
+  persistAllSettings();
 }
 
 function generateClassRooms(grade) {
@@ -2727,7 +2741,9 @@ function saveToLocalSilent() {
   try {
     collectAllSettings();
     localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
-  } catch (_) { /* ignore */ }
+  } catch (e) {
+    console.warn('Exam Flow: localStorage 저장 실패', e);
+  }
 }
 
 function applyLockStateToUI() {
@@ -3265,7 +3281,7 @@ const OUTPUT_DEFAULT_PRINT_SIZE = {
   'seat-map': 'a4-portrait',
   attendance: 'a4-portrait',
   'elective-students': 'b4-landscape',
-  personal: 'a4-portrait',
+  personal: 'b4-landscape',
   'room-assignment': 'a4-portrait'
 };
 
@@ -3302,6 +3318,83 @@ function getExamTitleLine() {
 function getExamTitleShort() {
   const m = appState.examMeta;
   return `${m.year}학년도 ${m.round}차 ${m.examName}`;
+}
+
+function sanitizeDownloadFilename(name) {
+  return String(name).replace(/[\\/:*?"<>|]/g, '_').replace(/\s+/g, ' ').trim();
+}
+
+function formatRoomGradeClassLabel(roomName, gradeFallback) {
+  const parsed = parseClassRoomName(roomName);
+  if (parsed) return `${parsed.grade}학년 ${parsed.classNo}반`;
+  if (Number.isFinite(gradeFallback)) return `${gradeFallback}학년`;
+  return roomName || '고사실';
+}
+
+function getExamDateSlash(day) {
+  const d = appState.examMeta.dates[day];
+  if (!d) return `${day}일차`;
+  const dt = new Date(d + 'T00:00:00');
+  return `${dt.getMonth() + 1}/${dt.getDate()}`;
+}
+
+function getOutputDownloadFilename(type, f) {
+  const examTitle = getExamTitleLine();
+  const bulk = !!f.bulkPrint;
+  const allGrades = f.bulkScope === 'all-grades';
+
+  switch (type) {
+    case 'seat-map': {
+      const layout = getSeatMapLayoutLabel(f.seatMapLayout || 'board');
+      if (allGrades) {
+        return sanitizeDownloadFilename(`${examTitle}_좌석배치도(${layout})_전체학년`);
+      }
+      if (bulk) {
+        return sanitizeDownloadFilename(`${examTitle}_좌석배치도(${layout})_${f.grade}학년 전체`);
+      }
+      return sanitizeDownloadFilename(
+        `${examTitle}_좌석배치도(${layout})_${formatRoomGradeClassLabel(f.room, f.grade)}`
+      );
+    }
+    case 'attendance': {
+      if (allGrades) {
+        return sanitizeDownloadFilename(`${examTitle}_응시 현황표_전체`);
+      }
+      const datePart = getExamDateSlash(f.day);
+      if (bulk) {
+        return sanitizeDownloadFilename(`${examTitle}_응시 현황표(${datePart})_전체`);
+      }
+      return sanitizeDownloadFilename(
+        `${examTitle}_응시 현황표(${datePart})_${formatRoomGradeClassLabel(f.room)}`
+      );
+    }
+    case 'elective-students': {
+      if (bulk || allGrades) {
+        return sanitizeDownloadFilename(`${examTitle}_선택과목 응시 현황_전체`);
+      }
+      return sanitizeDownloadFilename(
+        `${examTitle}_선택과목 응시 현황_${formatRoomGradeClassLabel(f.room)}`
+      );
+    }
+    case 'personal': {
+      if (bulk || allGrades) {
+        return sanitizeDownloadFilename(`${examTitle}_개인별 시험 시간표_전체`);
+      }
+      return sanitizeDownloadFilename(
+        `${examTitle}_개인별 시험 시간표_${formatRoomGradeClassLabel(f.room)}`
+      );
+    }
+    case 'room-assignment': {
+      if (bulk || allGrades) {
+        return sanitizeDownloadFilename(`${examTitle}_시험실배정현황_${f.day || 1}일차_전체`);
+      }
+      return sanitizeDownloadFilename(
+        `${examTitle}_시험실배정현황_${f.day || 1}일차_${f.grade}학년 ${f.classNo}반`
+      );
+    }
+    default:
+      return sanitizeDownloadFilename(document.title);
+  }
 }
 
 function formatElectiveStudentNumber(num) {
@@ -3764,7 +3857,7 @@ function renderAttendanceRoomDaySheet(room, day) {
   return `<div class="print-doc print-attendance print-attendance-matrix" data-att-groups="${groups.length}" data-att-data-rows="${totalDataRows}">
     ${renderDocValidationInline()}
     <header class="att-matrix-header">
-      <h1 class="att-main-title">${getExamTitleLine()} 응시현황표</h1>
+      <h1 class="att-main-title">${getExamTitleLine()} 결시현황표</h1>
       <p class="att-room-title">${roomLabel}</p>
       <div class="att-date-bar">
         <span class="att-date">${formatDate(day)}</span>
@@ -3905,6 +3998,21 @@ function getMoveStudentColumns(seatByCoord) {
   return cols;
 }
 
+function isDeskSeatMapLayout(layout) {
+  return layout === 'desk';
+}
+
+function getSeatMapLayoutLabel(layout) {
+  return isDeskSeatMapLayout(layout) ? '교탁 부착용' : '칠판 부착용';
+}
+
+function getSeatMapRowColOrders(rows, cols, layout) {
+  const desk = isDeskSeatMapLayout(layout);
+  const rowOrder = Array.from({ length: rows }, (_, i) => (desk ? rows - i : i + 1));
+  const colOrder = Array.from({ length: cols }, (_, i) => (desk ? cols - i : i + 1));
+  return { rowOrder, colOrder };
+}
+
 function getSeatMapBulkRooms(f) {
   if (hasFixedRoomSeats()) {
     return sortClassRoomNames(
@@ -3921,14 +4029,17 @@ function getSeatMapBulkRooms(f) {
 
 function renderSeatMapPage(f) {
   const fixed = hasFixedRoomSeats();
+  const layout = f.seatMapLayout || 'board';
+  const desk = isDeskSeatMapLayout(layout);
   const { seatConfig, seatByCoord, subject } = getSeatDataForSession(f.grade, f.day, f.period, f.room);
   const { rows, cols } = seatConfig;
   const moveMode = normalizeMoveColumnMode(seatConfig.moveStudentColumnMode);
   const split = usesSplitColumnLayout(f.room);
   const assigned = Object.keys(seatByCoord).length;
+  const { rowOrder, colOrder } = getSeatMapRowColOrders(rows, cols, layout);
 
   if (!assigned) {
-    return `<div class="print-doc print-seat-map">
+    return `<div class="print-doc print-seat-map${desk ? ' print-seat-map--desk' : ''}">
       ${renderDocValidationInline()}
       <p class="hint">배정된 좌석 데이터가 없습니다. Step 3에서 고정 좌석을 배정하세요.</p>
     </div>`;
@@ -3937,17 +4048,17 @@ function renderSeatMapPage(f) {
   let colLabels = '';
   if (split) {
     colLabels = '<thead><tr class="seat-map-col-labels">';
-    for (let c = 1; c <= cols; c++) {
+    colOrder.forEach(c => {
       const isMoveCol = isMoveColumn(c, moveMode);
       colLabels += `<th class="seat-map-col-label${isMoveCol ? ' seat-map-col-move' : ''}">${isMoveCol ? '이동반' : '본반'}</th>`;
-    }
+    });
     colLabels += '</tr></thead>';
   }
 
   let tbody = '<tbody>';
-  for (let r = 1; r <= rows; r++) {
+  rowOrder.forEach(r => {
     tbody += '<tr>';
-    for (let c = 1; c <= cols; c++) {
+    colOrder.forEach(c => {
       const seat = seatByCoord[`${r}-${c}`];
       const isMoveCol = split && isMoveColumn(c, moveMode);
       const colClass = isMoveCol ? ' seat-map-col-move' : '';
@@ -3959,33 +4070,47 @@ function renderSeatMapPage(f) {
       } else {
         tbody += `<td class="seat-empty${colClass}" aria-hidden="true"></td>`;
       }
-    }
+    });
     tbody += '</tr>';
-  }
+  });
   tbody += '</tbody>';
 
   const metaLine = fixed
-    ? `고사실 : ${f.room}`
-    : `${f.day}일차 ${f.period}교시 · 고사실 ${f.room}${subject ? ` · ${subject}` : ''}`;
+    ? `고사실 : ${f.room} · ${getSeatMapLayoutLabel(layout)}`
+    : `${f.day}일차 ${f.period}교시 · 고사실 ${f.room}${subject ? ` · ${subject}` : ''} · ${getSeatMapLayoutLabel(layout)}`;
 
-  return `<div class="print-doc print-seat-map" data-seat-body-rows="${rows}"${split ? ' data-seat-has-thead="1"' : ''}>
+  const orientTop = desk
+    ? `<div class="seat-map-orient-top">
+      <span class="seat-map-door-back">&lt; 출입문 뒷쪽 &gt;</span>
+    </div>`
+    : `<div class="seat-map-orient-top">
+      <span class="seat-map-teacher-desk">교 탁</span>
+      <span class="seat-map-door-front">&lt; 출입문 앞쪽 &gt;</span>
+    </div>`;
+
+  const orientBottom = desk
+    ? `<div class="seat-map-orient-bottom seat-map-orient-bottom--desk">
+      <span class="seat-map-door-front">&lt; 출입문 앞쪽 &gt;</span>
+      <span class="seat-map-teacher-desk">교 탁</span>
+      <span class="seat-map-orient-fill" aria-hidden="true"></span>
+    </div>`
+    : `<div class="seat-map-orient-bottom">
+      <span class="seat-map-door-back">&lt; 출입문 뒷쪽 &gt;</span>
+    </div>`;
+
+  return `<div class="print-doc print-seat-map${desk ? ' print-seat-map--desk' : ''}" data-seat-body-rows="${rows}"${split ? ' data-seat-has-thead="1"' : ''}>
     ${renderDocValidationInline()}
     <header class="seat-map-sheet-header">
       <h1 class="seat-map-sheet-title">좌석배치표</h1>
       <p class="seat-map-sheet-subtitle">${getExamTitleLine()}</p>
       <p class="seat-map-sheet-meta">${metaLine}</p>
     </header>
-    <div class="seat-map-orient-top">
-      <span class="seat-map-teacher-desk">교 탁</span>
-      <span class="seat-map-door-front">&lt; 출입문 앞쪽 &gt;</span>
-    </div>
+    ${orientTop}
     <table class="seat-layout-table seat-map-sheet-table" style="--seat-cols:${cols};--seat-rows:${rows}">
       ${colLabels}
       ${tbody}
     </table>
-    <div class="seat-map-orient-bottom">
-      <span class="seat-map-door-back">&lt; 출입문 뒷쪽 &gt;</span>
-    </div>
+    ${orientBottom}
   </div>`;
 }
 
@@ -4007,44 +4132,155 @@ function renderAttendanceDocument(f) {
   return rooms.map(room => renderAttendanceRoomDaySheet(room, f.day)).join('');
 }
 
-function renderPersonalStudentDoc(studentId) {
-  const st = appState.students[studentId];
-  if (!st) return '';
-
-  const schedule = (appState.studentExamSchedules[studentId] || [])
-    .map(entry => mapPersonalScheduleEntry(studentId, entry))
-    .sort((a, b) => a.day - b.day || a.period - b.period);
-
-  let table = `<table class="doc-table"><thead><tr>
-    <th>일차</th><th>날짜</th><th>교시</th><th>과목</th><th>시험실</th><th>좌석</th>
-  </tr></thead><tbody>`;
-  schedule.forEach(s => {
-    table += `<tr>
-      <td>${s.day}</td><td>${s.date}</td><td>${s.period}</td>
-      <td>${s.subject}</td><td>${s.room}</td><td>${formatSeatLabelForStudent(studentId, s.seatNo, s.room)}</td>
-    </tr>`;
+function getPeriodsForDay(day) {
+  let max = 0;
+  [1, 2, 3].forEach(grade => {
+    const periods = appState.timetable[grade]?.[day];
+    if (!periods) return;
+    Object.entries(periods).forEach(([p, subjects]) => {
+      if (subjects && subjects.length) {
+        max = Math.max(max, parseInt(p, 10));
+      }
+    });
   });
-  table += '</tbody></table>';
+  return max || appState.examMeta.periodsPerDay;
+}
 
-  return `<div class="print-doc print-personal">
-    ${renderDocHeader('개인별 시험 시간표', [
-      `${st.grade}학년 ${st.classNo}반 ${st.number}번`,
-      st.name
-    ])}
+function getPersonalBoardPeriodSlots() {
+  const slots = [];
+  for (let day = 1; day <= appState.examMeta.days; day++) {
+    const periodCount = getPeriodsForDay(day);
+    for (let period = 1; period <= periodCount; period++) {
+      slots.push({
+        day,
+        period,
+        dateLabel: formatDate(day),
+        periodLabel: `${period}교시`
+      });
+    }
+  }
+  return slots;
+}
+
+function getSubjectForStudentSlot(studentId, day, period) {
+  const entry = (appState.studentExamSchedules[studentId] || [])
+    .find(e => e.day === day && e.period === period);
+  return entry?.subject || '';
+}
+
+function getPersonalBoardStudentsForRoom(roomName) {
+  rebuildMoveTargetCache();
+  const residents = getResidentsForRoom(roomName);
+  const move = residents.filter(id => isMoveTargetStudent(appState.students[id]));
+  const fixed = residents.filter(id => !isMoveTargetStudent(appState.students[id]));
+  return [...sortStudentsByClass(move), ...sortStudentsByClass(fixed)];
+}
+
+function formatPersonalBoardRoomLabel(roomName) {
+  const parsed = parseClassRoomName(roomName);
+  if (parsed) return `${parsed.grade}-${parsed.classNo} 학급 게시용`;
+  return `${roomName} 게시용`;
+}
+
+function getPersonalBoardFooterNote() {
+  const ranges = [];
+  for (let day = 1; day <= appState.examMeta.days; ) {
+    const periods = getPeriodsForDay(day);
+    let endDay = day;
+    while (endDay < appState.examMeta.days && getPeriodsForDay(endDay + 1) === periods) endDay++;
+    const startLabel = formatDateShort(day);
+    const datePart = endDay > day
+      ? `${startLabel}~${formatDateShort(endDay).split('/')[1]}`
+      : startLabel;
+    ranges.push(`${datePart}은 ${periods}교시까지`);
+    day = endDay + 1;
+  }
+  return `*빈칸은 시험이 없는 시간임(시험이 없어도 ${ranges.join(', ')} 모두 본인 자리에서 자습)`;
+}
+
+function buildPersonalBoardTableHtml(studentIds, slots) {
+  if (!studentIds.length) return '';
+
+  let h1 = '<tr><th rowspan="2" class="pb-col-id">학번</th><th rowspan="2" class="pb-col-name">이름</th>';
+  for (let i = 0; i < slots.length;) {
+    const day = slots[i].day;
+    let count = 0;
+    while (i + count < slots.length && slots[i + count].day === day) count++;
+    h1 += `<th colspan="${count}">${slots[i].dateLabel}</th>`;
+    i += count;
+  }
+  h1 += '<th rowspan="2" class="pb-side-head" aria-hidden="true"></th></tr>';
+
+  let h2 = '<tr>';
+  slots.forEach(slot => { h2 += `<th>${slot.periodLabel}</th>`; });
+  h2 += '</tr>';
+
+  let body = '';
+  for (let i = 0; i < studentIds.length;) {
+    const st = appState.students[studentIds[i]];
+    const isMove = isMoveTargetStudent(st);
+    const label = isMove ? '이동' : '고정';
+    let j = i + 1;
+    while (j < studentIds.length) {
+      const stj = appState.students[studentIds[j]];
+      const moveJ = isMoveTargetStudent(stj);
+      if ((moveJ ? '이동' : '고정') !== label) break;
+      j++;
+    }
+    const span = j - i;
+
+    for (let k = i; k < j; k++) {
+      const sid = studentIds[k];
+      const student = appState.students[sid];
+      body += '<tr>';
+      body += `<td class="pb-col-id">${sid}</td>`;
+      body += `<td class="pb-col-name">${student.name}</td>`;
+      slots.forEach(slot => {
+        const subject = getSubjectForStudentSlot(sid, slot.day, slot.period);
+        body += `<td class="pb-subject">${subject}</td>`;
+      });
+      if (k === i) {
+        body += `<td rowspan="${span}" class="pb-side-label pb-side-${isMove ? 'move' : 'fixed'}">${label}</td>`;
+      }
+      body += '</tr>';
+    }
+    i = j;
+  }
+
+  return `<table class="doc-table personal-board-table"><thead>${h1}${h2}</thead><tbody>${body}</tbody></table>`;
+}
+
+function renderPersonalBoardPage(roomName) {
+  const studentIds = getPersonalBoardStudentsForRoom(roomName);
+  const slots = getPersonalBoardPeriodSlots();
+  if (!studentIds.length) {
+    return `<div class="print-doc print-personal-board"><p class="hint">${roomName || '고사실'} · 해당 교실 학생 데이터가 없습니다.</p></div>`;
+  }
+
+  const table = buildPersonalBoardTableHtml(studentIds, slots);
+  const roomLabel = formatPersonalBoardRoomLabel(roomName);
+  const footer = getPersonalBoardFooterNote();
+
+  return `<div class="print-doc print-personal-board" data-pb-body-rows="${studentIds.length}">
+    ${renderDocValidationInline()}
+    <header class="doc-header doc-header-print pb-header">
+      ${getSchoolNameLine() ? `<p class="doc-school">${getSchoolNameLine()}</p>` : ''}
+      <h1>${getExamTitleShort()}</h1>
+      <p class="doc-sub pb-subtitle">개인별 시험 시간표(${roomLabel})</p>
+    </header>
     ${table}
+    <p class="pb-footer-note">${footer}</p>
   </div>`;
 }
 
 function renderPersonalDocument(f) {
   if (f.bulkPrint) {
-    const students = Object.values(appState.students)
-      .filter(s => s.grade === f.grade && s.classNo === f.classNo)
-      .sort((a, b) => a.number - b.number);
-    if (!students.length) return '<p class="hint">해당 학급 학생이 없습니다.</p>';
-    return `<div class="personal-class-batch">${students.map(s => renderPersonalStudentDoc(s.studentId)).join('')}</div>`;
+    const rooms = getOutputRoomNames();
+    if (!rooms.length) return '<p class="hint">고사실이 없습니다.</p>';
+    return `<div class="personal-board-batch">${rooms.map(r => renderPersonalBoardPage(r)).join('')}</div>`;
   }
-  const doc = renderPersonalStudentDoc(f.studentId);
-  return doc || '<p class="hint">학생을 선택하세요.</p>';
+  if (!f.room) return '<p class="hint">고사실을 선택하세요.</p>';
+  return `<div class="personal-board-batch">${renderPersonalBoardPage(f.room)}</div>`;
 }
 
 /* ---------- 시험실배정현황 / 운영현황 조회 ---------- */
@@ -4285,17 +4521,8 @@ function renderOutputDocumentAllGrades(type, f) {
     }
     case 'elective-students':
       return renderElectiveStudentsDocument({ ...f, bulkPrint: true });
-    case 'personal': {
-      if (!grades.length) return '<p class="hint">학생 데이터가 없습니다.</p>';
-      const parts = [];
-      grades.forEach(g => {
-        getOrderedClassNosForGrade(g).forEach(classNo => {
-          parts.push(renderPersonalDocument({ ...f, grade: g, classNo, bulkPrint: true }));
-        });
-      });
-      if (!parts.length) return '<p class="hint">개인시간표 데이터가 없습니다.</p>';
-      return `<div class="personal-all-grades-batch">${parts.join('')}</div>`;
-    }
+    case 'personal':
+      return renderPersonalDocument({ ...f, bulkPrint: true });
     case 'room-assignment': {
       if (!grades.length) return '<p class="hint">학생 데이터가 없습니다.</p>';
       const parts = grades.map(g => renderRoomAssignmentDocument({ ...f, grade: g, bulkPrint: true }));
@@ -4307,17 +4534,17 @@ function renderOutputDocumentAllGrades(type, f) {
 }
 
 function outputHtmlHasDocuments(html) {
-  return html.includes('print-doc') || html.includes('print-seat-map') || html.includes('print-attendance-matrix');
+  return html.includes('print-doc') || html.includes('print-seat-map') || html.includes('print-attendance-matrix') || html.includes('print-personal-board');
 }
 
 function refreshOutputFilters() {
   const seatMapFields = hasFixedRoomSeats()
     ? ['grade', 'room']
     : ['grade', 'day', 'period', 'room'];
-  renderFilterGroup('filters-seat-map', [...seatMapFields, 'bulkPrint']);
+  renderFilterGroup('filters-seat-map', [...seatMapFields, 'seatMapLayout', 'bulkPrint']);
   renderFilterGroup('filters-attendance', ['day', 'room', 'bulkPrint']);
   renderFilterGroup('filters-elective-students', ['room', 'bulkPrint']);
-  renderFilterGroup('filters-personal', ['grade', 'class', 'student', 'bulkPrint']);
+  renderFilterGroup('filters-personal', ['room', 'bulkPrint']);
   renderFilterGroup('filters-room-assignment', ['grade', 'day', 'class', 'bulkPrint']);
 }
 
@@ -4352,6 +4579,12 @@ function renderFilterGroup(containerId, fields) {
   }
   if (fields.includes('subject')) {
     html += `<label>과목 <select class="filter-subject">${subjects.map(s => `<option value="${s}">${s}</option>`).join('')}</select></label>`;
+  }
+  if (fields.includes('seatMapLayout')) {
+    html += `<label>용도 <select class="filter-seat-map-layout">
+      <option value="board">칠판 부착용</option>
+      <option value="desk">교탁 부착용</option>
+    </select></label>`;
   }
   if (fields.includes('bulkPrint')) {
     html += `<label class="filter-check"><input type="checkbox" class="filter-bulk-print"> 일괄출력</label>`;
@@ -4410,7 +4643,8 @@ function getFiltersFromCard(type) {
     classNo: parseInt(get('.filter-class'), 10),
     studentId: get('.filter-student'),
     classAll: bulkPrint,
-    subject: get('.filter-subject')
+    subject: get('.filter-subject'),
+    seatMapLayout: get('.filter-seat-map-layout') || 'board'
   };
 }
 
@@ -4512,6 +4746,126 @@ function fitAttendanceSheetsToPage() {
       dataRowMm = nextRowMm;
     }
   });
+}
+
+const PERSONAL_BOARD_PAGE = {
+  'a4-portrait': { heightMm: 273, widthMm: 186 },
+  'a4-landscape': { heightMm: 190, widthMm: 277 },
+  'b4-portrait': { heightMm: 348, widthMm: 241 },
+  'b4-landscape': { heightMm: 237, widthMm: 344 }
+};
+
+const PERSONAL_BOARD_FOOTER_RESERVE_MM = 2;
+const PERSONAL_BOARD_SAFETY_MM = 2;
+const PERSONAL_BOARD_TARGET_ROW_MM = 6.5;
+const PERSONAL_BOARD_MAX_STUDENTS = 35;
+const PERSONAL_BOARD_MIN_DATA_ROW_MM = 2.2;
+const PERSONAL_BOARD_ABSOLUTE_MIN_ROW_MM = 2.0;
+const PERSONAL_BOARD_COMPACT_THRESHOLD_MM = 3.2;
+const PERSONAL_BOARD_TIGHT_CHROME_THRESHOLD_MM = 3.8;
+const PERSONAL_BOARD_FIT_MAX_ATTEMPTS = 24;
+const PERSONAL_BOARD_FIT_TOLERANCE = 0.992;
+
+function measurePersonalBoardChromePx(doc, table) {
+  return measureSeatMapChromePx(doc, table);
+}
+
+function resetPersonalBoardFit(doc) {
+  doc.classList.remove('personal-board-fit-applied', 'personal-board-compact', 'personal-board-tight-chrome', 'personal-board-ultra-fit');
+  doc.style.removeProperty('--pb-data-row-mm');
+  doc.style.removeProperty('--pb-page-width-mm');
+  doc.style.removeProperty('--pb-printable-height-mm');
+  doc.style.removeProperty('width');
+  doc.style.removeProperty('max-width');
+}
+
+function measurePersonalBoardDocHeightMm(doc, pxPerMm) {
+  const rectMm = doc.getBoundingClientRect().height / pxPerMm;
+  const scrollMm = doc.scrollHeight / pxPerMm;
+  return Math.max(rectMm, scrollMm);
+}
+
+function applyPersonalBoardRowSizing(doc, rowMm, { ultraFit = false } = {}) {
+  doc.style.setProperty('--pb-data-row-mm', `${rowMm.toFixed(2)}mm`);
+  doc.classList.toggle('personal-board-compact', rowMm < PERSONAL_BOARD_COMPACT_THRESHOLD_MM);
+  doc.classList.toggle('personal-board-tight-chrome', rowMm < PERSONAL_BOARD_TIGHT_CHROME_THRESHOLD_MM);
+  doc.classList.toggle('personal-board-ultra-fit', ultraFit);
+  doc.classList.add('personal-board-fit-applied');
+  void doc.offsetHeight;
+}
+
+function shrinkPersonalBoardToPage(doc, page, bodyRows, startRowMm, pageLimitMm) {
+  let rowMm = startRowMm;
+  let ultraFit = false;
+
+  const tryFit = () => {
+    applyPersonalBoardRowSizing(doc, rowMm, { ultraFit });
+    const table = doc.querySelector('.personal-board-table');
+    const pxPerMm = getSeatMapPxPerMm(table, page.widthMm);
+    return measurePersonalBoardDocHeightMm(doc, pxPerMm);
+  };
+
+  let docHeightMm = tryFit();
+
+  for (let attempt = 0; attempt < PERSONAL_BOARD_FIT_MAX_ATTEMPTS && docHeightMm > pageLimitMm; attempt++) {
+    const overflowMm = docHeightMm - pageLimitMm + 0.8;
+    const nextRowMm = Math.max(PERSONAL_BOARD_MIN_DATA_ROW_MM, rowMm - overflowMm / bodyRows);
+    if (nextRowMm >= rowMm - 0.015) break;
+    rowMm = nextRowMm;
+    docHeightMm = tryFit();
+  }
+
+  while (rowMm > PERSONAL_BOARD_MIN_DATA_ROW_MM && docHeightMm > pageLimitMm) {
+    rowMm = Math.max(PERSONAL_BOARD_MIN_DATA_ROW_MM, rowMm - 0.2);
+    docHeightMm = tryFit();
+  }
+
+  if (docHeightMm > pageLimitMm && !ultraFit) {
+    ultraFit = true;
+    docHeightMm = tryFit();
+  }
+
+  while (rowMm > PERSONAL_BOARD_ABSOLUTE_MIN_ROW_MM && docHeightMm > pageLimitMm) {
+    rowMm = Math.max(PERSONAL_BOARD_ABSOLUTE_MIN_ROW_MM, rowMm - 0.12);
+    docHeightMm = tryFit();
+  }
+
+  return docHeightMm <= pageLimitMm;
+}
+
+function fitSinglePersonalBoardDoc(doc, page) {
+  resetPersonalBoardFit(doc);
+
+  const table = doc.querySelector('.personal-board-table');
+  if (!table) return;
+
+  const bodyRows = parseInt(
+    doc.dataset.pbBodyRows || table.querySelectorAll('tbody tr').length || '0',
+    10
+  );
+  if (!bodyRows) return;
+
+  doc.style.setProperty('--pb-page-width-mm', `${page.widthMm}mm`);
+  doc.style.setProperty('--pb-printable-height-mm', `${page.heightMm}mm`);
+  doc.style.width = `${page.widthMm}mm`;
+  doc.style.maxWidth = '100%';
+
+  const pageLimitMm = page.heightMm * PERSONAL_BOARD_FIT_TOLERANCE;
+  let rowMm = PERSONAL_BOARD_TARGET_ROW_MM;
+
+  applyPersonalBoardRowSizing(doc, rowMm);
+  const pxPerMm = getSeatMapPxPerMm(table, page.widthMm);
+  let docHeightMm = measurePersonalBoardDocHeightMm(doc, pxPerMm);
+
+  if (docHeightMm > pageLimitMm) {
+    shrinkPersonalBoardToPage(doc, page, bodyRows, rowMm, pageLimitMm);
+  }
+}
+
+function fitPersonalBoardsToPage() {
+  const size = $('#print-size-select')?.value || DEFAULT_PRINT_SIZE;
+  const page = PERSONAL_BOARD_PAGE[size] || PERSONAL_BOARD_PAGE['b4-landscape'];
+  $$('#output-preview .print-personal-board').forEach(doc => fitSinglePersonalBoardDoc(doc, page));
 }
 
 const SEAT_MAP_PAGE = {
@@ -4646,6 +5000,7 @@ function fitSeatMapsToPage() {
 function fitOutputPreviewToPage() {
   fitAttendanceSheetsToPage();
   fitSeatMapsToPage();
+  fitPersonalBoardsToPage();
 }
 
 function refreshOutputPreview() {
@@ -4660,28 +5015,6 @@ function refreshOutputPreview() {
   updatePrintSizeForCurrentOutput();
   $('#output-preview').innerHTML = renderOutputDocument(currentPreviewType, f);
   requestAnimationFrame(() => requestAnimationFrame(fitOutputPreviewToPage));
-}
-
-function handleExcelExport(outputType) {
-  const type = outputType || currentPreviewType;
-  if (!type) {
-    alert('출력물을 선택하세요.');
-    return;
-  }
-  if (!window.ExamFlowExcel) {
-    alert('엑셀보내기 모듈을 불러오지 못했습니다. 페이지를 새로고침해 주세요.');
-    return;
-  }
-  const f = getFiltersFromCard(type);
-  window.ExamFlowExcel.exportToExcel(type, f);
-}
-
-function handleDashboardExcelExport() {
-  if (!window.ExamFlowExcel) {
-    alert('엑셀보내기 모듈을 불러오지 못했습니다. 페이지를 새로고침해 주세요.');
-    return;
-  }
-  window.ExamFlowExcel.exportDashboardExcel();
 }
 
 let step5OutputInitialized = false;
@@ -4705,32 +5038,22 @@ function initStep5Output() {
       if (container.querySelector('.filter-room')) updateOutputRoomFilter(container);
       if (container.querySelector('.filter-class')) updatePersonalFilters(container);
     }
-    if (container.id === 'filters-personal' || container.id === 'filters-room-assignment') {
+    if (container.id === 'filters-room-assignment') {
       updatePersonalFilters(container);
     }
     refreshOutputPreview();
   });
 
-  $('#btn-export-excel')?.addEventListener('click', () => handleExcelExport());
-  $$('.btn-excel-export').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      handleExcelExport(btn.dataset.output);
-    });
-  });
   $$('.output-btn-pdf-all').forEach(btn => {
     btn.addEventListener('click', e => {
       e.stopPropagation();
       downloadAllGradesPdf(btn.dataset.output);
     });
   });
-  $('#btn-export-dashboard')?.addEventListener('click', handleDashboardExcelExport);
   $('#print-size-select')?.addEventListener('change', applyPrintSizeClass);
 
   window.addEventListener('beforeprint', () => {
-    if (currentPreviewType === 'seat-map' || $$('#output-preview .print-seat-map').length) {
-      fitSeatMapsToPage();
-    }
+    fitOutputPreviewToPage();
   });
 
   refreshOutputFilters();
@@ -4756,7 +5079,8 @@ function removePrintEnhancements() {
   $$('.print-page-footer').forEach(el => el.remove());
   [
     ['.print-attendance-matrix', 'attendance-fit-applied'],
-    ['.print-seat-map', 'seat-map-fit-applied']
+    ['.print-seat-map', 'seat-map-fit-applied'],
+    ['.print-personal-board', 'personal-board-fit-applied']
   ].forEach(([selector, appliedClass]) => {
     $$(selector).forEach(doc => {
       doc.classList.remove(appliedClass);
@@ -4775,29 +5099,18 @@ function removePrintEnhancements() {
       if (appliedClass === 'attendance-fit-applied') {
         doc.style.removeProperty('--att-data-row-mm');
       }
+      if (appliedClass === 'personal-board-fit-applied') {
+        doc.classList.remove('personal-board-compact', 'personal-board-tight-chrome', 'personal-board-ultra-fit');
+        doc.style.removeProperty('--pb-data-row-mm');
+        doc.style.removeProperty('--pb-page-width-mm');
+        doc.style.removeProperty('--pb-printable-height-mm');
+      }
     });
   });
 }
 
 function getAllGradesPdfTitle(type, f) {
-  const meta = appState.examMeta;
-  const slug = meta?.year && meta?.semester != null
-    ? `${meta.year}_${meta.semester}학기`
-    : '시험';
-  switch (type) {
-    case 'seat-map':
-      return `좌석배치표_${slug}_전체학년`;
-    case 'attendance':
-      return `응시현황표_${slug}_전체일차`;
-    case 'elective-students':
-      return `선택과목응시학생_${slug}_전체고사실`;
-    case 'personal':
-      return `개인시간표_${slug}_전체학년`;
-    case 'room-assignment':
-      return `시험실배정현황_${slug}_전체학년_${f.day || 1}일차`;
-    default:
-      return document.title;
-  }
+  return getOutputDownloadFilename(type, { ...f, bulkPrint: true, bulkScope: 'all-grades' });
 }
 
 function confirmPrintWarnings() {
@@ -4872,13 +5185,13 @@ function downloadAllGradesPdf(outputType) {
   if (!outputType) { alert('출력물을 선택하세요.'); return; }
   if (!confirmPrintWarnings()) return;
 
-  if (outputType === 'personal') {
-    const count = Object.keys(appState.students).length;
-    if (count > 80 && !confirm(`전체 학년 개인시간표는 약 ${count}명 분량입니다.\nPDF 저장에 시간이 걸릴 수 있습니다. 계속하시겠습니까?`)) return;
-  }
-
   selectOutputType(outputType);
   const f = getFiltersFromCard(outputType);
+  if (outputType === 'personal') {
+    const rooms = getOutputRoomNames();
+    if (rooms.length > 24 && !confirm(`전체 고사실 개인시간표는 ${rooms.length}개 교실 분량입니다.\nPDF 저장에 시간이 걸릴 수 있습니다. 계속하시겠습니까?`)) return;
+  }
+
   const html = renderOutputDocumentAllGrades(outputType, f);
   if (!outputHtmlHasDocuments(html)) {
     alert('전체 출력할 데이터가 없습니다.');
@@ -4897,22 +5210,7 @@ function downloadAllGradesPdf(outputType) {
 
 function getPrintDocumentTitle() {
   const f = getFiltersFromCard(currentPreviewType);
-  if (currentPreviewType !== 'attendance') {
-    if (currentPreviewType === 'seat-map') {
-      return f.bulkPrint ? `좌석배치표_${f.day}일차_전체` : `좌석배치표_${f.room}`;
-    }
-    return document.title;
-  }
-
-  const d = appState.examMeta.dates[f.day];
-  let dateSuffix = `${f.day}일차`;
-  if (d) {
-    const dt = new Date(d + 'T00:00:00');
-    dateSuffix = `${dt.getMonth() + 1}.${dt.getDate()}`;
-  }
-  if (f.bulkPrint) return `응시현황표_${f.day}일차_전체`;
-  const roomPart = f.room || '교실';
-  return `응시현황표_${roomPart}반_${dateSuffix}`;
+  return getOutputDownloadFilename(currentPreviewType, f);
 }
 
 function printOutput() {
@@ -4963,9 +5261,8 @@ function tryLoadLocalOnInit() {
 }
 
 function saveToLocal() {
-  collectAllSettings();
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+    persistAllSettings();
     alert('작업이 저장되었습니다. (localStorage)');
   } catch (e) {
     alert('저장 실패: ' + e.message);
@@ -5145,12 +5442,22 @@ function initStepNav() {
 function initEvents() {
   $('#btn-apply-meta').addEventListener('click', applyExamMeta);
   $('#meta-days').addEventListener('change', () => {
+    flushDOMBeforeTimetableRender();
     renderExamDates();
     renderUnifiedTimetable();
+    persistAllSettings();
   });
-  $('#meta-periods')?.addEventListener('change', renderUnifiedTimetable);
+  $('#meta-periods')?.addEventListener('change', () => {
+    flushDOMBeforeTimetableRender();
+    renderUnifiedTimetable();
+    persistAllSettings();
+  });
   $('#exam-dates-container')?.addEventListener('change', e => {
-    if (e.target.classList.contains('exam-date-input')) renderUnifiedTimetable();
+    if (e.target.classList.contains('exam-date-input')) {
+      flushDOMBeforeTimetableRender();
+      renderUnifiedTimetable();
+      persistAllSettings();
+    }
   });
   $('#btn-save-timetable').addEventListener('click', saveTimetable);
 
@@ -5267,6 +5574,10 @@ function initAutoSave() {
   document.addEventListener('input', e => {
     if (e.target.matches('.exam-date-input, .timetable-input')) scheduleAutoSave();
   });
+
+  window.addEventListener('beforeunload', () => {
+    if (!autoSavePaused) persistAllSettings();
+  });
 }
 
 /* ========== Init ========== */
@@ -5298,54 +5609,5 @@ function init() {
   autoSavePaused = false;
   window.examFlowState = appState;
 }
-
-window.examFlowExportApi = {
-  getSchoolNameLine,
-  getExamTitleLine,
-  getExamMeta: () => appState.examMeta,
-  getPeriodsPerDay: () => appState.examMeta.periodsPerDay,
-  getClassAssignmentData,
-  getRoomAssignmentData,
-  getRoomOperationData,
-  getOperationDashboardStats,
-  getAttendanceRows,
-  getAttendanceRoomDayData,
-  getAttendanceGroupRowCount,
-  getRoomsForDay,
-  getRoomsForSession,
-  getSortedRoomNames,
-  sortClassRoomNames,
-  compareClassRoomNames,
-  getPlacementBlockingErrors,
-  getExportBlockingMessage,
-  getUnassignedStudentCount,
-  getSeatInfoForStudent,
-  getSeatDataForSession,
-  getSeatMapBulkRooms,
-  getMoveStudentColumns,
-  getClassRooms: () => getClassRooms(),
-  hasFixedRoomSeats,
-  getResidentsForRoom,
-  getSeatConfig,
-  usesSplitColumnLayout,
-  formatSeatNumberLabel,
-  formatSeatLabelForStudent,
-  getSplitSeatLabelAtCoord,
-  getExamTitleShort,
-  getElectiveStudentsColumns,
-  getElectiveStudentsColumnsForRoom,
-  getElectiveStudentsSectionsForRoom,
-  formatElectiveRoomHeader,
-  getOutputRoomNames,
-  buildElectiveStudentsTableHtml,
-  formatElectiveStudentNumber,
-  getPersonalScheduleData,
-  sortStudentsByClass,
-  examGroupKey,
-  maskName,
-  isAbsenceNote,
-  runOperationDiagnosis,
-  getOperationDiagnosisErrors
-};
 
 document.addEventListener('DOMContentLoaded', init);

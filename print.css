@@ -274,6 +274,25 @@ body.print-size-b4-portrait {
   justify-content: flex-end;
 }
 
+.seat-map-orient-bottom--desk {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+.seat-map-orient-bottom--desk .seat-map-door-front {
+  justify-self: start;
+}
+
+.seat-map-orient-bottom--desk .seat-map-teacher-desk {
+  justify-self: center;
+  grid-column: 2;
+}
+
+.seat-map-orient-fill {
+  visibility: hidden;
+}
+
 .seat-map-teacher-desk,
 .seat-map-door-front,
 .seat-map-door-back {
@@ -360,6 +379,105 @@ body.print-size-b4-portrait {
 .print-seat-map.seat-map-fit-applied .seat-map-orient-top,
 .print-seat-map.seat-map-fit-applied .seat-map-orient-bottom {
   margin: 0.2rem 0;
+}
+
+/* 개인별 시간표 — 한 페이지 맞춤 (fit 적용 시) */
+.print-personal-board.personal-board-fit-applied {
+  width: var(--pb-page-width-mm, 344mm);
+  max-width: 100%;
+  margin-left: auto;
+  margin-right: auto;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.print-personal-board.personal-board-fit-applied .personal-board-table tbody td {
+  height: var(--pb-data-row-mm, 6.5mm) !important;
+  max-height: var(--pb-data-row-mm, 6.5mm) !important;
+  min-height: 0;
+  padding: clamp(0.5mm, calc(var(--pb-data-row-mm, 6.5mm) * 0.14), 1.2mm) 0.08rem;
+  overflow: hidden;
+  line-height: 1.22;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+.print-personal-board.personal-board-fit-applied:not(.personal-board-compact) .personal-board-table {
+  font-size: 0.62rem;
+}
+
+.print-personal-board.personal-board-fit-applied:not(.personal-board-compact) .pb-subject {
+  font-size: 0.58rem;
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-tight-chrome .pb-header {
+  margin-bottom: 0.15rem;
+  padding-bottom: 0.05rem;
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-tight-chrome .pb-header h1 {
+  font-size: 0.95rem;
+  margin: 0.05rem 0;
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-tight-chrome .pb-subtitle {
+  font-size: 0.82rem;
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-tight-chrome .pb-footer-note {
+  font-size: 0.56rem;
+  margin-top: 0.15rem;
+  line-height: 1.25;
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-tight-chrome .personal-board-table th {
+  padding: 0.12rem 0.08rem;
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-ultra-fit .pb-header {
+  margin-bottom: 0.08rem;
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-ultra-fit .pb-header h1 {
+  font-size: 0.88rem;
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-ultra-fit .pb-subtitle {
+  font-size: 0.76rem;
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-ultra-fit .pb-footer-note {
+  font-size: 0.5rem;
+  margin-top: 0.1rem;
+  line-height: 1.2;
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-compact .personal-board-table tbody td {
+  padding: clamp(0.15mm, calc(var(--pb-data-row-mm) * 0.1), 0.55mm) 0.06rem;
+  line-height: 1.1;
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-compact .personal-board-table {
+  font-size: clamp(6pt, calc(var(--pb-data-row-mm) * 0.52), 8pt);
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-compact .pb-subject {
+  font-size: clamp(5.5pt, calc(var(--pb-data-row-mm) * 0.46), 7pt);
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-compact .pb-header h1 {
+  font-size: clamp(9.5pt, calc(var(--pb-data-row-mm) * 1.05), 11pt);
+  margin: 0.08rem 0;
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-compact .pb-subtitle {
+  font-size: clamp(8.5pt, calc(var(--pb-data-row-mm) * 0.9), 10pt);
+}
+
+.print-personal-board.personal-board-fit-applied.personal-board-compact .pb-footer-note {
+  font-size: clamp(6pt, calc(var(--pb-data-row-mm) * 0.58), 7pt);
+  margin-top: 0.15rem;
+  line-height: 1.25;
 }
 
 .move-badge {
@@ -1095,7 +1213,140 @@ body.print-size-b4-portrait {
     padding: 0.2rem 0.15rem;
   }
 
-  /* 개인별 시간표 — 학급 일괄 페이지 분리 */
+  /* 개인별 시간표 — 고사실 게시용 B4 가로 */
+  .print-personal-board {
+    max-width: var(--print-page-width, 364mm);
+  }
+
+  .print-personal-board .pb-header {
+    text-align: center;
+    border-bottom: none;
+    margin-bottom: 0.35rem;
+    padding-bottom: 0.2rem;
+  }
+
+  .print-personal-board .pb-header h1 {
+    font-size: 1.05rem;
+    margin: 0.15rem 0;
+  }
+
+  .print-personal-board .pb-subtitle {
+    font-size: 0.92rem;
+    font-weight: 700;
+    margin: 0.1rem 0 0;
+  }
+
+  .print-personal-board .personal-board-table {
+    font-size: 0.62rem;
+    table-layout: fixed;
+    width: 100%;
+  }
+
+  .print-personal-board .personal-board-table th,
+  .print-personal-board .personal-board-table td {
+    padding: 0.2rem 0.1rem;
+    line-height: 1.3;
+    text-align: center;
+    word-break: keep-all;
+  }
+
+  .print-personal-board .personal-board-table tbody td {
+    padding-top: 0.24rem;
+    padding-bottom: 0.24rem;
+  }
+
+  .print-personal-board .pb-col-id {
+    width: 2.6rem;
+    min-width: 2.6rem;
+  }
+
+  .print-personal-board .pb-col-name {
+    width: 3rem;
+    min-width: 3rem;
+  }
+
+  .print-personal-board .pb-subject {
+    font-size: 0.58rem;
+  }
+
+  .print-personal-board .pb-side-label {
+    width: 1.4rem;
+    min-width: 1.4rem;
+    writing-mode: vertical-rl;
+    text-orientation: mixed;
+    letter-spacing: 0.25em;
+    font-weight: 700;
+    font-size: 0.68rem;
+    vertical-align: middle;
+  }
+
+  .print-personal-board .pb-side-head {
+    width: 1.4rem;
+    border-left: none;
+  }
+
+  .print-personal-board .pb-footer-note {
+    margin-top: 0.35rem;
+    font-size: 0.62rem;
+    line-height: 1.45;
+    text-align: left;
+  }
+
+  body.print-size-b4-landscape .print-personal-board .personal-board-table {
+    font-size: 0.66rem;
+  }
+
+  body.print-size-b4-landscape .print-personal-board .personal-board-table tbody td {
+    padding-top: 0.28rem;
+    padding-bottom: 0.28rem;
+  }
+
+  .personal-board-batch .print-doc {
+    page-break-after: always;
+    break-after: page;
+  }
+
+  .personal-board-batch .print-doc:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+
+  /* 개인별 시간표 — 한 페이지 고정 */
+  .print-personal-board {
+    page-break-inside: avoid;
+    break-inside: avoid;
+    overflow: hidden;
+  }
+
+  .print-personal-board.personal-board-fit-applied {
+    max-height: var(--pb-printable-height-mm, 237mm);
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    overflow: hidden;
+  }
+
+  .print-personal-board.personal-board-fit-applied .personal-board-table,
+  .print-personal-board.personal-board-fit-applied .personal-board-table thead,
+  .print-personal-board.personal-board-fit-applied .personal-board-table tbody {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  .print-personal-board.personal-board-fit-applied .personal-board-table tbody tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .print-personal-board.personal-board-fit-applied .personal-board-table tbody td {
+    height: var(--pb-data-row-mm) !important;
+    max-height: var(--pb-data-row-mm) !important;
+  }
+
+  .print-personal-board.personal-board-fit-applied .pb-header {
+    margin-bottom: 0.2rem;
+  }
+
+  /* 개인별 시간표 — 학급 일괄 페이지 분리 (legacy) */
   .personal-class-batch .print-doc {
     page-break-after: always;
     break-after: page;
