@@ -3377,11 +3377,14 @@ function getOutputDownloadFilename(type, f) {
       );
     }
     case 'personal': {
-      if (bulk || allGrades) {
+      if (allGrades) {
         return sanitizeDownloadFilename(`${examTitle}_개인별 시험 시간표_전체`);
       }
+      if (bulk) {
+        return sanitizeDownloadFilename(`${examTitle}_개인별 시험 시간표_${f.grade}학년 전체`);
+      }
       return sanitizeDownloadFilename(
-        `${examTitle}_개인별 시험 시간표_${formatRoomGradeClassLabel(f.room)}`
+        `${examTitle}_개인별 시험 시간표_${f.grade}학년 ${f.classNo}반`
       );
     }
     case 'room-assignment': {
@@ -4168,18 +4171,21 @@ function getSubjectForStudentSlot(studentId, day, period) {
   return entry?.subject || '';
 }
 
-function getPersonalBoardStudentsForRoom(roomName) {
-  rebuildMoveTargetCache();
-  const residents = getResidentsForRoom(roomName);
-  const move = residents.filter(id => isMoveTargetStudent(appState.students[id]));
-  const fixed = residents.filter(id => !isMoveTargetStudent(appState.students[id]));
-  return [...sortStudentsByClass(move), ...sortStudentsByClass(fixed)];
+function getPersonalBoardClassKeys(grade) {
+  const keys = new Map();
+  Object.values(appState.students).forEach(s => {
+    if (Number.isFinite(grade) && s.grade !== grade) return;
+    keys.set(`${s.grade}-${s.classNo}`, { grade: s.grade, classNo: s.classNo });
+  });
+  return [...keys.values()].sort((a, b) => compareGradeClass(a.grade, a.classNo, b.grade, b.classNo));
 }
 
-function formatPersonalBoardRoomLabel(roomName) {
-  const parsed = parseClassRoomName(roomName);
-  if (parsed) return `${parsed.grade}-${parsed.classNo} 학급 게시용`;
-  return `${roomName} 게시용`;
+function getPersonalBoardStudentsForClass(grade, classNo) {
+  return getStudentsInClass(grade, classNo).map(s => s.studentId);
+}
+
+function formatPersonalBoardClassLabel(grade, classNo) {
+  return `${grade}-${classNo} 학급 게시용`;
 }
 
 function getPersonalBoardFooterNote() {
@@ -4232,7 +4238,7 @@ function buildPersonalBoardTableHtml(studentIds, slots) {
     for (let k = i; k < j; k++) {
       const sid = studentIds[k];
       const student = appState.students[sid];
-      body += '<tr>';
+      body += `<tr class="pb-row-${isMove ? 'move' : 'fixed'}">`;
       body += `<td class="pb-col-id">${sid}</td>`;
       body += `<td class="pb-col-name">${student.name}</td>`;
       slots.forEach(slot => {
@@ -4250,15 +4256,15 @@ function buildPersonalBoardTableHtml(studentIds, slots) {
   return `<table class="doc-table personal-board-table"><thead>${h1}${h2}</thead><tbody>${body}</tbody></table>`;
 }
 
-function renderPersonalBoardPage(roomName) {
-  const studentIds = getPersonalBoardStudentsForRoom(roomName);
+function renderPersonalBoardPage(grade, classNo) {
+  const studentIds = getPersonalBoardStudentsForClass(grade, classNo);
   const slots = getPersonalBoardPeriodSlots();
   if (!studentIds.length) {
-    return `<div class="print-doc print-personal-board"><p class="hint">${roomName || '고사실'} · 해당 교실 학생 데이터가 없습니다.</p></div>`;
+    return `<div class="print-doc print-personal-board"><p class="hint">${grade}학년 ${classNo}반 · 학생 데이터가 없습니다.</p></div>`;
   }
 
   const table = buildPersonalBoardTableHtml(studentIds, slots);
-  const roomLabel = formatPersonalBoardRoomLabel(roomName);
+  const classLabel = formatPersonalBoardClassLabel(grade, classNo);
   const footer = getPersonalBoardFooterNote();
 
   return `<div class="print-doc print-personal-board" data-pb-body-rows="${studentIds.length}">
@@ -4266,7 +4272,7 @@ function renderPersonalBoardPage(roomName) {
     <header class="doc-header doc-header-print pb-header">
       ${getSchoolNameLine() ? `<p class="doc-school">${getSchoolNameLine()}</p>` : ''}
       <h1>${getExamTitleShort()}</h1>
-      <p class="doc-sub pb-subtitle">개인별 시험 시간표(${roomLabel})</p>
+      <p class="doc-sub pb-subtitle">개인별 시험 시간표(${classLabel})</p>
     </header>
     ${table}
     <p class="pb-footer-note">${footer}</p>
@@ -4275,12 +4281,16 @@ function renderPersonalBoardPage(roomName) {
 
 function renderPersonalDocument(f) {
   if (f.bulkPrint) {
-    const rooms = getOutputRoomNames();
-    if (!rooms.length) return '<p class="hint">고사실이 없습니다.</p>';
-    return `<div class="personal-board-batch">${rooms.map(r => renderPersonalBoardPage(r)).join('')}</div>`;
+    const classes = f.bulkScope === 'all-grades'
+      ? getPersonalBoardClassKeys()
+      : getPersonalBoardClassKeys(f.grade);
+    if (!classes.length) return '<p class="hint">학급 데이터가 없습니다.</p>';
+    return `<div class="personal-board-batch">${classes.map(c => renderPersonalBoardPage(c.grade, c.classNo)).join('')}</div>`;
   }
-  if (!f.room) return '<p class="hint">고사실을 선택하세요.</p>';
-  return `<div class="personal-board-batch">${renderPersonalBoardPage(f.room)}</div>`;
+  if (!Number.isFinite(f.grade) || !Number.isFinite(f.classNo)) {
+    return '<p class="hint">학년·반을 선택하세요.</p>';
+  }
+  return `<div class="personal-board-batch">${renderPersonalBoardPage(f.grade, f.classNo)}</div>`;
 }
 
 /* ---------- 시험실배정현황 / 운영현황 조회 ---------- */
@@ -4522,7 +4532,7 @@ function renderOutputDocumentAllGrades(type, f) {
     case 'elective-students':
       return renderElectiveStudentsDocument({ ...f, bulkPrint: true });
     case 'personal':
-      return renderPersonalDocument({ ...f, bulkPrint: true });
+      return renderPersonalDocument({ ...f, bulkPrint: true, bulkScope: 'all-grades' });
     case 'room-assignment': {
       if (!grades.length) return '<p class="hint">학생 데이터가 없습니다.</p>';
       const parts = grades.map(g => renderRoomAssignmentDocument({ ...f, grade: g, bulkPrint: true }));
@@ -4544,7 +4554,7 @@ function refreshOutputFilters() {
   renderFilterGroup('filters-seat-map', [...seatMapFields, 'seatMapLayout', 'bulkPrint']);
   renderFilterGroup('filters-attendance', ['day', 'room', 'bulkPrint']);
   renderFilterGroup('filters-elective-students', ['room', 'bulkPrint']);
-  renderFilterGroup('filters-personal', ['room', 'bulkPrint']);
+  renderFilterGroup('filters-personal', ['grade', 'class', 'bulkPrint']);
   renderFilterGroup('filters-room-assignment', ['grade', 'day', 'class', 'bulkPrint']);
 }
 
@@ -5038,7 +5048,7 @@ function initStep5Output() {
       if (container.querySelector('.filter-room')) updateOutputRoomFilter(container);
       if (container.querySelector('.filter-class')) updatePersonalFilters(container);
     }
-    if (container.id === 'filters-room-assignment') {
+    if (container.id === 'filters-personal' || container.id === 'filters-room-assignment') {
       updatePersonalFilters(container);
     }
     refreshOutputPreview();
@@ -5188,8 +5198,8 @@ function downloadAllGradesPdf(outputType) {
   selectOutputType(outputType);
   const f = getFiltersFromCard(outputType);
   if (outputType === 'personal') {
-    const rooms = getOutputRoomNames();
-    if (rooms.length > 24 && !confirm(`전체 고사실 개인시간표는 ${rooms.length}개 교실 분량입니다.\nPDF 저장에 시간이 걸릴 수 있습니다. 계속하시겠습니까?`)) return;
+    const classes = getPersonalBoardClassKeys();
+    if (classes.length > 24 && !confirm(`전체 학급 개인시간표는 ${classes.length}개 학급 분량입니다.\nPDF 저장에 시간이 걸릴 수 있습니다. 계속하시겠습니까?`)) return;
   }
 
   const html = renderOutputDocumentAllGrades(outputType, f);

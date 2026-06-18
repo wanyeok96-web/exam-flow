@@ -1811,6 +1811,15 @@ input:focus, select:focus, textarea:focus {
 .output-preview .personal-board-table .pb-col-id { width: 3.2rem; }
 .output-preview .personal-board-table .pb-col-name { width: 3.6rem; }
 .output-preview .personal-board-table .pb-subject { font-size: 0.65rem; }
+
+.output-preview .personal-board-table tr.pb-row-fixed td {
+  background-color: #e8e8e8;
+}
+
+.output-preview .personal-board-table tr.pb-row-move td {
+  background-color: #fff;
+}
+
 .output-preview .personal-board-table .pb-side-label {
   width: 1.6rem;
   writing-mode: vertical-rl;
