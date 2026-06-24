@@ -280,6 +280,22 @@ body.print-size-b4-portrait {
   align-items: center;
 }
 
+.seat-map-orient-top--board {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
+}
+
+.seat-map-orient-top--board .seat-map-teacher-desk {
+  justify-self: center;
+  grid-column: 2;
+}
+
+.seat-map-orient-top--board .seat-map-door-front {
+  justify-self: end;
+  grid-column: 3;
+}
+
 .seat-map-orient-bottom--desk .seat-map-door-front {
   justify-self: start;
 }
@@ -573,8 +589,8 @@ body.print-size-b4-portrait {
 }
 
 .board-seat-guide__top-row {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
   margin-bottom: 0.5rem;
   padding: 0 0.25rem;
@@ -583,10 +599,14 @@ body.print-size-b4-portrait {
 }
 
 .board-seat-guide__teacher-desk {
-  text-align: left;
+  justify-self: center;
+  grid-column: 2;
+  text-align: center;
 }
 
 .board-seat-guide__door-front {
+  justify-self: end;
+  grid-column: 3;
   text-align: right;
 }
 

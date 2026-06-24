@@ -455,7 +455,7 @@ function renderRoomOccupancyPanel() {
   if (!panel) return;
 
   if (!Object.keys(appState.students).length) {
-    panel.innerHTML = '<p class="hint">학생 데이터 업로드 후 교실별 상주 현황이 표시됩니다.</p>';
+    panel.innerHTML = '<p class="hint">학생 데이터 업로드 후 교실별 배치 현황이 표시됩니다.</p>';
     return;
   }
 
@@ -469,7 +469,7 @@ function renderRoomOccupancyPanel() {
   }
 
   let html = '<table class="data-table"><thead><tr>' +
-    '<th>교실</th><th>상주 인원</th><th>정원</th><th>좌석 수</th><th>상태</th></tr></thead><tbody>';
+    '<th>교실</th><th>배치 인원</th><th>정원</th><th>좌석 수</th><th>상태</th></tr></thead><tbody>';
 
   const caps = getSplitSeatCapacities(seatConfig.rows, seatConfig.cols, seatConfig.moveStudentColumnMode);
   classRooms.forEach(room => {
@@ -486,7 +486,7 @@ function renderRoomOccupancyPanel() {
         : '<span class="validation-ok">정상</span>';
     html += `<tr>
       <td>${room.name}</td>
-      <td>${residents.length}명 (본반 ${homeCount} · 이동반 ${moveCount})</td>
+      <td>${residents.length}명 (본 반 ${homeCount} · 이동반 ${moveCount})</td>
       <td>${room.capacity}명</td>
       <td>본반 ${caps.home} · 이동반 ${caps.move}</td>
       <td>${status}</td>
@@ -494,7 +494,7 @@ function renderRoomOccupancyPanel() {
   });
 
   html += '</tbody></table>';
-  html += '<p class="hint" style="margin-top:0.5rem">반=교실 원칙: 본반 학생(이동 제외) + 이동반 유입 학생이 각 교실에 상주합니다.</p>';
+  html += '<p class="hint" style="margin-top:0.5rem">반=교실 원칙: 본 반 학생(이동 제외) + 이동반 유입 학생이 각 교실에 배치됩니다.</p>';
   panel.innerHTML = html;
 }
 
@@ -3515,8 +3515,8 @@ function formatElectiveRoomHeader(roomName, studentGrade) {
   if (parsed) {
     const isResident = studentGrade === parsed.grade;
     const audience = studentGrade == null
-      ? '상주·이동 학생 포함'
-      : isResident ? '상주 학생' : `${studentGrade}학년 이동 학생`;
+      ? '본 반·이동 학생 포함'
+      : isResident ? '본 반 학생' : `${studentGrade}학년 이동 학생`;
     return {
       roomLabel: `[${roomName}반 교실]`,
       subtitle: `${parsed.grade}학년 ${parsed.classNo}반 고사실 · ${gradeLine}`,
@@ -3870,7 +3870,7 @@ function renderAttendanceRoomDaySheet(room, day) {
   const periodNums = Array.from({ length: appState.examMeta.periodsPerDay }, (_, i) => i + 1);
   const groups = getAttendanceGroupsForRoom(room);
   if (!groups.length) {
-    return `<div class="print-doc print-attendance"><p class="hint">${room} 교실 상주 학생이 없습니다.</p></div>`;
+    return `<div class="print-doc print-attendance"><p class="hint">${room} 교실에 배치된 학생이 없습니다.</p></div>`;
   }
 
   const roomLabel = parseClassRoomName(room)
@@ -4109,7 +4109,8 @@ function renderSeatMapPage(f) {
     ? `<div class="seat-map-orient-top">
       <span class="seat-map-door-back">&lt; 출입문 뒷쪽 &gt;</span>
     </div>`
-    : `<div class="seat-map-orient-top">
+    : `<div class="seat-map-orient-top seat-map-orient-top--board">
+      <span class="seat-map-orient-fill" aria-hidden="true"></span>
       <span class="seat-map-teacher-desk">교 탁</span>
       <span class="seat-map-door-front">&lt; 출입문 앞쪽 &gt;</span>
     </div>`;
@@ -4752,7 +4753,7 @@ function fitAttendanceSheetsToPage() {
   const size = $('#print-size-select')?.value || DEFAULT_PRINT_SIZE;
   const page = ATTENDANCE_PAGE[size] || ATTENDANCE_PAGE['a4-portrait'];
 
-  $$('#output-preview .print-attendance-matrix').forEach(doc => {
+  $$('#output-preview .print-attendance-matrix, #bulk-export-stage .print-attendance-matrix').forEach(doc => {
     doc.classList.remove('attendance-fit-applied');
     doc.style.removeProperty('--att-data-row-mm');
 
@@ -4902,7 +4903,7 @@ function fitSinglePersonalBoardDoc(doc, page) {
 function fitPersonalBoardsToPage() {
   const size = $('#print-size-select')?.value || DEFAULT_PRINT_SIZE;
   const page = PERSONAL_BOARD_PAGE[size] || PERSONAL_BOARD_PAGE['b4-landscape'];
-  $$('#output-preview .print-personal-board').forEach(doc => fitSinglePersonalBoardDoc(doc, page));
+  $$('#output-preview .print-personal-board, #bulk-export-stage .print-personal-board').forEach(doc => fitSinglePersonalBoardDoc(doc, page));
 }
 
 const SEAT_MAP_PAGE = {
@@ -5031,13 +5032,385 @@ function fitSingleSeatMapDoc(doc, page) {
 function fitSeatMapsToPage() {
   const size = $('#print-size-select')?.value || DEFAULT_PRINT_SIZE;
   const page = SEAT_MAP_PAGE[size] || SEAT_MAP_PAGE['a4-portrait'];
-  $$('#output-preview .print-seat-map').forEach(doc => fitSingleSeatMapDoc(doc, page));
+  $$('#output-preview .print-seat-map, #bulk-export-stage .print-seat-map').forEach(doc => fitSingleSeatMapDoc(doc, page));
 }
 
 function fitOutputPreviewToPage() {
   fitAttendanceSheetsToPage();
   fitSeatMapsToPage();
   fitPersonalBoardsToPage();
+}
+
+/* ========== 반별·시험실 일괄 zip 저장 ========== */
+
+const BULK_EXPORT_PRINT_SIZE = {
+  'seat-map-board': 'a4-portrait',
+  'seat-map-desk': 'a4-portrait',
+  attendance: 'a4-portrait',
+  elective: 'b4-landscape',
+  personal: 'b4-landscape',
+  'room-assignment': 'a4-portrait'
+};
+
+const PDF_PAGE_CONFIG = {
+  'a4-portrait': { format: 'a4', orientation: 'portrait', margin: 10, contentWidthMm: 186, contentHeightMm: 273 },
+  'a4-landscape': { format: 'a4', orientation: 'landscape', margin: 8, contentWidthMm: 277, contentHeightMm: 190 },
+  'b4-landscape': { format: [353, 250], orientation: 'landscape', margin: 8, contentWidthMm: 344, contentHeightMm: 237 },
+  'b4-portrait': { format: [250, 353], orientation: 'portrait', margin: 6, contentWidthMm: 241, contentHeightMm: 348 }
+};
+
+const BULK_EXPORT_PRINT_DOC_SELECTOR = '.print-doc, .print-seat-map, .print-attendance-matrix, .print-personal-board, .print-elective-students, .print-room-assignment';
+
+function getBulkExportSelections() {
+  const panel = $('#class-bulk-work-card');
+  if (!panel) return null;
+  return {
+    seatMapBoard: !!panel.querySelector('[data-bulk="seat-map-board"]')?.checked,
+    seatMapDesk: !!panel.querySelector('[data-bulk="seat-map-desk"]')?.checked,
+    attendance: !!panel.querySelector('[data-bulk="attendance"]')?.checked,
+    elective: !!panel.querySelector('[data-bulk="elective"]')?.checked,
+    personal: !!panel.querySelector('[data-bulk="personal"]')?.checked,
+    roomAssignment: !!panel.querySelector('[data-bulk="room-assignment"]')?.checked,
+    grades: [1, 2, 3].filter(g => panel.querySelector(`[data-bulk-grade="${g}"]`)?.checked)
+  };
+}
+
+function getBulkGradeZipName(grade) {
+  return sanitizeDownloadFilename(`${grade}학년.zip`);
+}
+
+function getBulkClassFolderName(grade, classNo) {
+  return sanitizeDownloadFilename(`${grade}-${classNo}`);
+}
+
+function getClassHomeroomRoom(grade, classNo) {
+  const name = `${grade}-${classNo}`;
+  return appState.rooms.some(r => r.name === name) ? name : null;
+}
+
+/** 반별 zip 폴더용 시험실 = 학급교실(2-1). 본 반 학생 + 내려온 이동반이 배치되는 공간 */
+function getClassExamRoom(grade, classNo) {
+  return getClassHomeroomRoom(grade, classNo);
+}
+
+function getSeatMapFiltersForRoom(room, layout, grade) {
+  const parsed = parseClassRoomName(room);
+  return {
+    room,
+    grade: grade ?? parsed?.grade ?? 1,
+    day: 1,
+    period: 1,
+    seatMapLayout: layout
+  };
+}
+
+function getExamDayNumbers() {
+  return Array.from({ length: appState.examMeta.days }, (_, i) => i + 1);
+}
+
+function buildClassBulkFiles(selections, grade, classNo) {
+  const files = [];
+  const days = getExamDayNumbers();
+  const examRoom = getClassExamRoom(grade, classNo);
+
+  if (selections.personal) {
+    const html = renderPersonalBoardPage(grade, classNo);
+    if (outputHtmlHasDocuments(html)) {
+      files.push({
+        name: sanitizeDownloadFilename('개인별 시험 시간표.pdf'),
+        html: `<div class="personal-board-batch">${html}</div>`,
+        printSize: BULK_EXPORT_PRINT_SIZE.personal
+      });
+    }
+  }
+
+  if (selections.roomAssignment) {
+    days.forEach(day => {
+      const html = renderClassAssignmentPage(day, grade, classNo);
+      if (outputHtmlHasDocuments(html)) {
+        files.push({
+          name: sanitizeDownloadFilename(`시험실배정현황(${day}일차).pdf`),
+          html,
+          printSize: BULK_EXPORT_PRINT_SIZE['room-assignment']
+        });
+      }
+    });
+  }
+
+  if (!examRoom) return files;
+
+  if (selections.seatMapBoard) {
+    const html = renderSeatMapPage(getSeatMapFiltersForRoom(examRoom, 'board', grade));
+    if (outputHtmlHasDocuments(html)) {
+      files.push({
+        name: sanitizeDownloadFilename('좌석배치도(칠판부착용).pdf'),
+        html,
+        printSize: BULK_EXPORT_PRINT_SIZE['seat-map-board']
+      });
+    }
+  }
+
+  if (selections.seatMapDesk) {
+    const html = renderSeatMapPage(getSeatMapFiltersForRoom(examRoom, 'desk', grade));
+    if (outputHtmlHasDocuments(html)) {
+      files.push({
+        name: sanitizeDownloadFilename('좌석배치도(교탁부착용).pdf'),
+        html,
+        printSize: BULK_EXPORT_PRINT_SIZE['seat-map-desk']
+      });
+    }
+  }
+
+  if (selections.attendance) {
+    days.forEach(day => {
+      const html = renderAttendanceRoomDaySheet(examRoom, day);
+      if (outputHtmlHasDocuments(html)) {
+        files.push({
+          name: sanitizeDownloadFilename(`결시현황표(${day}일차).pdf`),
+          html,
+          printSize: BULK_EXPORT_PRINT_SIZE.attendance
+        });
+      }
+    });
+  }
+
+  if (selections.elective) {
+    const html = renderElectiveStudentsPage(examRoom);
+    if (outputHtmlHasDocuments(html)) {
+      files.push({
+        name: sanitizeDownloadFilename('선택과목 응시 학생.pdf'),
+        html: `<div class="elective-students-batch">${html}</div>`,
+        printSize: BULK_EXPORT_PRINT_SIZE.elective
+      });
+    }
+  }
+
+  return files;
+}
+
+function buildBulkZipPlans(selections, grades) {
+  return grades.map(grade => {
+    const classFolders = getOrderedClassNosForGrade(grade)
+      .map(classNo => {
+        const files = buildClassBulkFiles(selections, grade, classNo);
+        if (!files.length) return null;
+        return {
+          folderName: getBulkClassFolderName(grade, classNo),
+          files
+        };
+      })
+      .filter(Boolean);
+
+    if (!classFolders.length) return null;
+    return { zipName: getBulkGradeZipName(grade), classFolders };
+  }).filter(Boolean);
+}
+
+function waitAnimationFrames(count = 2) {
+  return new Promise(resolve => {
+    let remaining = count;
+    const step = () => {
+      remaining -= 1;
+      if (remaining <= 0) resolve();
+      else requestAnimationFrame(step);
+    };
+    requestAnimationFrame(step);
+  });
+}
+
+async function renderHtmlToPdfBlob(html, printSize, stageEl) {
+  const jsPDF = window.jspdf?.jsPDF;
+  const html2canvasFn = window.html2canvas;
+  if (!jsPDF || !html2canvasFn) {
+    throw new Error('PDF 생성 라이브러리(html2canvas/jsPDF)를 불러오지 못했습니다.');
+  }
+
+  const cfg = PDF_PAGE_CONFIG[printSize] || PDF_PAGE_CONFIG['a4-portrait'];
+  const sizeSel = $('#print-size-select');
+  if (sizeSel) sizeSel.value = printSize;
+
+  stageEl.innerHTML = `<div class="bulk-export-render-root">${html}</div>`;
+  stageEl.style.width = `${cfg.contentWidthMm}mm`;
+  stageEl.style.maxWidth = 'none';
+
+  setPrintSizeClassOnly();
+  document.body.classList.add('bulk-export-active', 'print-mode');
+  applyDynamicPrintPageStyle();
+
+  await waitAnimationFrames(4);
+  fitOutputPreviewToPage();
+  await waitAnimationFrames(4);
+
+  if (!outputHtmlHasDocuments(stageEl.innerHTML)) {
+    stageEl.innerHTML = '';
+    document.body.classList.remove('print-mode');
+    return null;
+  }
+
+  const root = stageEl.querySelector('.bulk-export-render-root');
+  const elements = root.querySelectorAll(BULK_EXPORT_PRINT_DOC_SELECTOR);
+  const targets = elements.length ? [...elements] : [root];
+
+  const pdf = new jsPDF({
+    unit: 'mm',
+    format: cfg.format,
+    orientation: cfg.orientation,
+    compress: true
+  });
+
+  try {
+    for (let i = 0; i < targets.length; i++) {
+      const el = targets[i];
+      if (i > 0) pdf.addPage(cfg.format, cfg.orientation);
+
+      el.style.width = `${cfg.contentWidthMm}mm`;
+      el.style.maxWidth = `${cfg.contentWidthMm}mm`;
+      el.style.boxSizing = 'border-box';
+
+      await waitAnimationFrames(2);
+      fitOutputPreviewToPage();
+      await waitAnimationFrames(2);
+
+      const canvas = await html2canvasFn(el, {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff',
+        width: el.offsetWidth,
+        height: el.offsetHeight,
+        windowWidth: el.scrollWidth,
+        windowHeight: el.scrollHeight
+      });
+
+      const pageW = pdf.internal.pageSize.getWidth();
+      const pageH = pdf.internal.pageSize.getHeight();
+      const margin = cfg.margin;
+      const maxW = pageW - margin * 2;
+      const maxH = pageH - margin * 2;
+      const imgData = canvas.toDataURL('image/jpeg', 0.92);
+      const imgRatio = canvas.width / canvas.height;
+      const boxRatio = maxW / maxH;
+
+      let drawW;
+      let drawH;
+      if (imgRatio > boxRatio) {
+        drawW = maxW;
+        drawH = maxW / imgRatio;
+      } else {
+        drawH = maxH;
+        drawW = maxH * imgRatio;
+      }
+
+      const offsetX = margin + (maxW - drawW) / 2;
+      const offsetY = margin + (maxH - drawH) / 2;
+      pdf.addImage(imgData, 'JPEG', offsetX, offsetY, drawW, drawH, undefined, 'FAST');
+    }
+
+    return pdf.output('blob');
+  } catch (err) {
+    throw new Error(`PDF 변환 실패 (${printSize}): ${err.message || err}`);
+  } finally {
+    stageEl.innerHTML = '';
+    stageEl.style.width = '';
+    stageEl.style.maxWidth = '';
+    document.body.classList.remove('print-mode');
+  }
+}
+
+function downloadBlobFile(blob, filename) {
+  return new Promise(resolve => {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.click();
+    URL.revokeObjectURL(url);
+    setTimeout(resolve, 350);
+  });
+}
+
+async function runClassBulkExport() {
+  if (typeof JSZip === 'undefined') {
+    alert('zip 생성 라이브러리(JSZip)를 불러오지 못했습니다.');
+    return;
+  }
+
+  const sel = getBulkExportSelections();
+  if (!sel.grades.length) {
+    alert('학년을 하나 이상 선택하세요.');
+    return;
+  }
+
+  const hasAnyOutput = sel.seatMapBoard || sel.seatMapDesk || sel.attendance
+    || sel.elective || sel.personal || sel.roomAssignment;
+  if (!hasAnyOutput) {
+    alert('출력물을 하나 이상 선택하세요.');
+    return;
+  }
+  if (!confirmPrintWarnings()) return;
+
+  const allPlans = buildBulkZipPlans(sel, sel.grades);
+
+  if (!allPlans.length) {
+    alert('선택한 조건에 해당하는 출력 데이터가 없습니다.');
+    return;
+  }
+
+  const totalPdfs = allPlans.reduce(
+    (sum, plan) => sum + plan.classFolders.reduce((folderSum, folder) => folderSum + folder.files.length, 0),
+    0
+  );
+  if (totalPdfs > 40 && !confirm(`총 ${totalPdfs}개 PDF를 생성합니다.\n시간이 다소 걸릴 수 있습니다. 계속하시겠습니까?`)) return;
+
+  const btn = $('#btn-class-bulk-save');
+  const prevBtnText = btn?.textContent;
+  const stageEl = $('#bulk-export-stage');
+  const sizeSel = $('#print-size-select');
+  const prevSize = sizeSel?.value;
+
+  if (!stageEl) {
+    alert('내부 렌더 영역을 찾을 수 없습니다.');
+    return;
+  }
+
+  document.body.classList.add('bulk-export-active');
+  if (btn) btn.disabled = true;
+
+  let done = 0;
+  let savedCount = 0;
+  try {
+    for (const plan of allPlans) {
+      const zip = new JSZip();
+      for (const classFolder of plan.classFolders) {
+        for (const file of classFolder.files) {
+          done += 1;
+          if (btn) btn.textContent = `생성 중… (${done}/${totalPdfs})`;
+          const blob = await renderHtmlToPdfBlob(file.html, file.printSize, stageEl);
+          if (blob) zip.file(`${classFolder.folderName}/${file.name}`, blob);
+        }
+      }
+      if (!Object.keys(zip.files).length) continue;
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      await downloadBlobFile(zipBlob, plan.zipName);
+      savedCount += 1;
+    }
+    if (!savedCount) {
+      alert('PDF 생성에 실패했습니다.\n출력 데이터가 없거나 브라우저에서 PDF 변환을 차단했을 수 있습니다.');
+      return;
+    }
+    alert(`${savedCount}개 zip 파일 저장을 시작했습니다.\n브라우저 다운로드 폴더를 확인하세요.`);
+  } catch (e) {
+    alert('일괄 저장 실패: ' + e.message);
+  } finally {
+    stageEl.innerHTML = '';
+    if (sizeSel) sizeSel.value = prevSize;
+    document.body.classList.remove('bulk-export-active', 'print-mode');
+    setPrintSizeClassOnly();
+    if (btn) {
+      btn.disabled = false;
+      btn.textContent = prevBtnText;
+    }
+  }
 }
 
 function refreshOutputPreview() {
@@ -5057,6 +5430,39 @@ function scheduleRefreshOutputPreview() {
 
 let step5OutputInitialized = false;
 
+function initClassBulkExportUI() {
+  const panel = $('#class-bulk-work-card');
+  if (!panel) return;
+
+  const allOutputs = panel.querySelector('#bulk-select-all-outputs');
+  const outputChecks = [...panel.querySelectorAll('[data-bulk]')];
+  const allGrades = panel.querySelector('#bulk-select-all-grades');
+  const gradeChecks = [...panel.querySelectorAll('[data-bulk-grade]')];
+
+  const syncSelectAll = (master, items) => {
+    if (!master || !items.length) return;
+    const checkedCount = items.filter(cb => cb.checked).length;
+    master.checked = checkedCount === items.length;
+    master.indeterminate = checkedCount > 0 && checkedCount < items.length;
+  };
+
+  allOutputs?.addEventListener('change', () => {
+    outputChecks.forEach(cb => { cb.checked = allOutputs.checked; });
+    allOutputs.indeterminate = false;
+  });
+  outputChecks.forEach(cb => {
+    cb.addEventListener('change', () => syncSelectAll(allOutputs, outputChecks));
+  });
+
+  allGrades?.addEventListener('change', () => {
+    gradeChecks.forEach(cb => { cb.checked = allGrades.checked; });
+    allGrades.indeterminate = false;
+  });
+  gradeChecks.forEach(cb => {
+    cb.addEventListener('change', () => syncSelectAll(allGrades, gradeChecks));
+  });
+}
+
 function initStep5Output() {
   if (step5OutputInitialized) {
     refreshOutputFilters();
@@ -5064,6 +5470,8 @@ function initStep5Output() {
     return;
   }
   step5OutputInitialized = true;
+
+  initClassBulkExportUI();
 
   $$('.output-index-tab').forEach(tab => {
     tab.addEventListener('click', () => selectOutputType(tab.dataset.output));
@@ -5088,6 +5496,7 @@ function initStep5Output() {
       downloadAllGradesPdf(btn.dataset.output);
     });
   });
+  $('#btn-class-bulk-save')?.addEventListener('click', runClassBulkExport);
   $('#print-size-select')?.addEventListener('change', applyPrintSizeClass);
 
   window.addEventListener('beforeprint', () => {

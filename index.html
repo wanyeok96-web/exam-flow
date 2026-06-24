@@ -9,6 +9,9 @@
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="print.css">
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
 </head>
 <body>
   <div class="app-shell">
@@ -272,14 +275,14 @@
       </div>
 
       <div class="card section-card">
-        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🏫</span> 교실별 상주 현황</h2>
-        <p class="hint">반=교실 원칙으로 본반 학생(이동 제외)과 이동반 유입 학생이 자동 계산됩니다. 과목별 고사실 수동 배정은 필요 없습니다.</p>
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🏫</span> 교실별 배치 현황</h2>
+        <p class="hint">반=교실 원칙으로 본 반 학생(이동 제외)과 이동반 유입 학생이 자동 계산됩니다. 과목별 고사실 수동 배정은 필요 없습니다.</p>
         <div id="room-occupancy-panel"></div>
       </div>
 
       <div class="card section-card">
         <h2 class="card__title"><span class="card-icon" aria-hidden="true">🪑</span> 고정 좌석 부여</h2>
-        <p class="hint">교실별 상주 학생에게 좌석을 1회 부여합니다. 시험 일정 생성·페이지 불러오기 시 <strong>자동 배정</strong>되며, 필요할 때만 아래 버튼으로 재배정하세요.</p>
+        <p class="hint">각 교실에 배치된 학생(본 반·이동반)에게 좌석을 1회 부여합니다. 시험 일정 생성·페이지 불러오기 시 <strong>자동 배정</strong>되며, 필요할 때만 아래 버튼으로 재배정하세요.</p>
         <button type="button" id="btn-assign-seats" class="btn btn-secondary">고정 좌석 재배정</button>
         <div id="seat-assign-result" class="info-box hidden"></div>
       </div>
@@ -473,6 +476,50 @@
           </div>
         </div>
       </div>
+
+      <div class="card section-card class-bulk-work-card" id="class-bulk-work-card">
+        <div class="class-bulk-card-head">
+          <h2 class="card__title"><span class="card-icon" aria-hidden="true">📦</span> 반별 출력물 생성</h2>
+        </div>
+        <p class="output-desc class-bulk-card-desc">학년을 선택하면 <strong>학년별 zip 1개</strong>(예: <code>2학년.zip</code>)가 생성됩니다. zip 안에는 반별 폴더(<code>2-1</code>, <code>2-2</code> …)가 있고, 각 폴더에 선택한 출력물 PDF가 들어갑니다.</p>
+        <div class="class-bulk-export">
+          <div class="class-bulk-columns">
+            <section class="class-bulk-column">
+              <h4 class="class-bulk-column-title">출력물 선택</h4>
+              <div class="class-bulk-panel class-bulk-panel--outputs">
+                <label class="class-bulk-check class-bulk-check--all">
+                  <input type="checkbox" id="bulk-select-all-outputs">
+                  <span class="class-bulk-check-label">전체선택</span>
+                </label>
+                <ul class="class-bulk-check-list">
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk="seat-map-board"><span class="class-bulk-check-label">좌석배치도(칠판부착용)</span></label></li>
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk="seat-map-desk"><span class="class-bulk-check-label">좌석배치도(교탁부착용)</span></label></li>
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk="attendance"><span class="class-bulk-check-label">결시현황표 <span class="class-bulk-hint">(일차별)</span></span></label></li>
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk="elective"><span class="class-bulk-check-label">선택과목 응시 학생</span></label></li>
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk="personal"><span class="class-bulk-check-label">개인별 시험 시간표</span></label></li>
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk="room-assignment"><span class="class-bulk-check-label">시험실 배정 현황표 <span class="class-bulk-hint">(일차별)</span></span></label></li>
+                </ul>
+              </div>
+            </section>
+            <section class="class-bulk-column">
+              <h4 class="class-bulk-column-title">학년 선택</h4>
+              <div class="class-bulk-panel class-bulk-panel--grades">
+                <label class="class-bulk-check class-bulk-check--all">
+                  <input type="checkbox" id="bulk-select-all-grades">
+                  <span class="class-bulk-check-label">전체선택</span>
+                </label>
+                <ul class="class-bulk-check-list class-bulk-check-list--grades">
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk-grade="1"><span class="class-bulk-check-label">1학년</span></label></li>
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk-grade="2"><span class="class-bulk-check-label">2학년</span></label></li>
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk-grade="3"><span class="class-bulk-check-label">3학년</span></label></li>
+                </ul>
+              </div>
+            </section>
+          </div>
+          <button type="button" id="btn-class-bulk-save" class="btn btn-primary class-bulk-save-btn">선택 항목 zip 저장</button>
+          <p class="class-bulk-note">학년을 여러 개 선택하면 학년마다 zip 파일이 각각 생성됩니다.</p>
+        </div>
+      </div>
     </section>
   </main>
 
@@ -480,6 +527,8 @@
       <p>Exam Flow v0.9 — 모든 데이터는 <code>window.examFlowState</code>에서 확인할 수 있습니다.</p>
     </footer>
   </div>
+
+  <div id="bulk-export-stage" class="bulk-export-stage" aria-hidden="true"></div>
 
   <script src="script.js"></script>
   <script src="ui-present.js"></script>
