@@ -1322,12 +1322,12 @@ function deleteStudent(studentId) {
   if (!confirm(`${st.name} (${studentId}) 학생을 삭제할까요?`)) return;
 
   removeStudentsFromState([studentId]);
-  renderStudentSummary();
-  renderSubjectStats();
-  renderStudentList();
-  renderMovementPreview();
-  renderRoomOccupancyPanel();
-  markPlacementDirty();
+  touchStepUI('2', renderStep2UI);
+  if (isStepActive('1')) renderMovementPreview();
+  else invalidateSteps('1');
+  touchStepUI('3', renderStep3UI);
+  invalidateSteps('4', '5');
+  invalidateDiagnosis();
   syncStateToWindow();
 }
 
@@ -1451,11 +1451,10 @@ async function handleGradeUpload(grade, file) {
     statusEl.classList.add('done');
     showEl(errorEl, false);
     rebuildMoveTargetCache();
-    renderStudentSummary();
-    renderSubjectStats();
-    renderStudentList();
-    renderMovementPreview();
-    renderRoomOccupancyPanel();
+    touchStepUI('2', renderStep2UI);
+    if (isStepActive('1')) renderMovementPreview();
+    invalidateSteps('3', '4', '5');
+    invalidateDiagnosis();
     syncStateToWindow();
     if (appState.examGroups.length) tryAutoAssignFixedSeats();
   } catch (err) {
@@ -1654,9 +1653,11 @@ function generateSchedulesAndGroups() {
   showEl(resultEl, true);
 
   populateExamGroupFilters();
-  renderExamGroupsTable();
-  renderRoomOccupancyPanel();
-  refreshOutputFilters();
+  touchStepUI('3', renderStep3UI);
+  if (isStepActive('5')) refreshOutputFilters();
+  else invalidateSteps('5');
+  invalidateSteps('4');
+  invalidateDiagnosis();
   syncStateToWindow();
 }
 
@@ -1877,9 +1878,9 @@ function applyFixedSeatAssignmentResult({ count, overflowCount }, { prefix = '' 
     resultEl.textContent = msg;
     showEl(resultEl, true);
   }
-  renderExamGroupsTable();
-  renderRoomOccupancyPanel();
-  markPlacementDirty();
+  touchStepUI('3', renderStep3UI);
+  invalidateSteps('4', '5');
+  invalidateDiagnosis();
   syncStateToWindow();
   saveToLocalSilent();
   return msg;
@@ -2107,6 +2108,12 @@ let placementEditorDirty = true;
 let placementFilterDelegationBound = false;
 let placementPagerDelegationBound = false;
 let placementRoomNavBound = false;
+
+const stepUIReady = {};
+let step5PreviewStale = false;
+let outputPreviewDebounce = null;
+let movementPreviewDebounce = null;
+let seatPreviewDebounce = null;
 
 function placementOverrideKey(studentId, day, period) {
   return `${studentId}-${day}-${period}`;
@@ -2472,7 +2479,10 @@ function getUnassignedStudentCount() {
 }
 
 function getOperationDiagnosisErrors() {
-  return runOperationDiagnosis().items.filter(i => i.status === 'error');
+  if (appState._lastDiagnosis) {
+    return appState._lastDiagnosis.items.filter(i => i.status === 'error');
+  }
+  return getPlacementBlockingErrors().map(message => ({ message }));
 }
 
 function getExportBlockingMessage() {
@@ -2792,6 +2802,16 @@ function renderOperationDiagnosis() {
   });
   html += '</tbody></table>';
   tableEl.innerHTML = html;
+  window.examFlowUI?.refreshDiagnosisPills();
+}
+
+function invalidateDiagnosis() {
+  appState._lastDiagnosis = null;
+  if ($('#step-5')?.classList.contains('active')) {
+    renderOperationDiagnosis();
+    renderOutputValidationBanner();
+    window.examFlowUI?.refreshDiagnosisPills();
+  }
 }
 
 function runAndShowOperationDiagnosis() {
@@ -3185,7 +3205,8 @@ function applyBulkPlacementChanges() {
   renderPlacementValidationBanner();
   renderPlacementChangeHistory();
   renderOutputValidationBanner();
-  if ($('#step-5')?.classList.contains('active')) refreshOutputPreview();
+  if ($('#step-5')?.classList.contains('active')) scheduleRefreshOutputPreview();
+  else invalidateSteps('5');
 }
 
 function assignSeparateRoomToSelected() {
@@ -3202,7 +3223,8 @@ function assignSeparateRoomToSelected() {
   renderPlacementValidationBanner();
   renderPlacementChangeHistory();
   renderOutputValidationBanner();
-  if ($('#step-5')?.classList.contains('active')) refreshOutputPreview();
+  if ($('#step-5')?.classList.contains('active')) scheduleRefreshOutputPreview();
+  else invalidateSteps('5');
 }
 
 function applyDefaultPlacementFiltersIfNeeded() {
@@ -3263,7 +3285,8 @@ function initPlacementEditorEvents() {
     renderPlacementValidationBanner();
     renderPlacementChangeHistory();
     renderOutputValidationBanner();
-    if ($('#step-5')?.classList.contains('active')) refreshOutputPreview();
+    if ($('#step-5')?.classList.contains('active')) scheduleRefreshOutputPreview();
+  else invalidateSteps('5');
   });
 }
 
@@ -4658,11 +4681,20 @@ function getFiltersFromCard(type) {
   };
 }
 
+function setPrintSizeClassOnly() {
+  const size = $('#print-size-select')?.value || DEFAULT_PRINT_SIZE;
+  document.body.classList.remove(
+    'print-size-a4-portrait', 'print-size-a4-landscape',
+    'print-size-b4-landscape', 'print-size-b4-portrait'
+  );
+  document.body.classList.add(`print-size-${size}`);
+}
+
 function updatePrintSizeForCurrentOutput() {
   const sizeSel = $('#print-size-select');
   if (!sizeSel) return;
   sizeSel.value = OUTPUT_DEFAULT_PRINT_SIZE[currentPreviewType] || DEFAULT_PRINT_SIZE;
-  applyPrintSizeClass();
+  setPrintSizeClassOnly();
 }
 
 function selectOutputType(type) {
@@ -4677,11 +4709,6 @@ function selectOutputType(type) {
     el.classList.toggle('active', on);
     el.hidden = !on;
   });
-  const sizeSel = $('#print-size-select');
-  if (sizeSel) {
-    sizeSel.value = OUTPUT_DEFAULT_PRINT_SIZE[type] || DEFAULT_PRINT_SIZE;
-    applyPrintSizeClass();
-  }
   refreshOutputPreview();
 }
 
@@ -5014,17 +5041,18 @@ function fitOutputPreviewToPage() {
 }
 
 function refreshOutputPreview() {
-  reconcileFixedSeatCoords();
   renderOperationDashboard();
-  if (Object.keys(appState.students).length) {
-    appState._lastDiagnosis = runOperationDiagnosis();
-  }
   renderOperationDiagnosis();
   renderOutputValidationBanner();
   const f = getFiltersFromCard(currentPreviewType);
   updatePrintSizeForCurrentOutput();
   $('#output-preview').innerHTML = renderOutputDocument(currentPreviewType, f);
   requestAnimationFrame(() => requestAnimationFrame(fitOutputPreviewToPage));
+}
+
+function scheduleRefreshOutputPreview() {
+  clearTimeout(outputPreviewDebounce);
+  outputPreviewDebounce = setTimeout(refreshOutputPreview, 80);
 }
 
 let step5OutputInitialized = false;
@@ -5051,7 +5079,7 @@ function initStep5Output() {
     if (container.id === 'filters-personal' || container.id === 'filters-room-assignment') {
       updatePersonalFilters(container);
     }
-    refreshOutputPreview();
+    scheduleRefreshOutputPreview();
   });
 
   $$('.output-btn-pdf-all').forEach(btn => {
@@ -5071,12 +5099,7 @@ function initStep5Output() {
 }
 
 function applyPrintSizeClass() {
-  const size = $('#print-size-select')?.value || DEFAULT_PRINT_SIZE;
-  document.body.classList.remove(
-    'print-size-a4-portrait', 'print-size-a4-landscape',
-    'print-size-b4-landscape', 'print-size-b4-portrait'
-  );
-  document.body.classList.add(`print-size-${size}`);
+  setPrintSizeClassOnly();
   fitOutputPreviewToPage();
 }
 
@@ -5236,6 +5259,7 @@ let autoSavePaused = false;
 
 function syncStateToWindow() {
   window.examFlowState = appState;
+  window.examFlowUI?.refreshStepProgress();
   scheduleAutoSave();
 }
 
@@ -5398,13 +5422,8 @@ function restoreUI() {
   }
   if ($('#seat-door-side')) $('#seat-door-side').value = sd.doorSide || 'left';
 
-  renderUnifiedTimetable();
-  renderMovementRules();
   rebuildMoveTargetCache();
-  renderMovementPreview();
-  renderSeatConfigPreview();
-  renderRoomsGradeSetup();
-  renderRoomsList();
+  renderStep1UI();
 
   [1, 2, 3].forEach(g => {
     const count = Object.values(appState.students).filter(s => s.grade === g).length;
@@ -5415,17 +5434,94 @@ function restoreUI() {
     }
   });
 
-  renderStudentSummary();
-  renderSubjectStats();
-  renderStudentList();
-  populateExamGroupFilters();
-  renderExamGroupsTable();
-  renderRoomOccupancyPanel();
-  markPlacementDirty();
-  initStep5Output();
+  invalidateSteps('2', '3', '4', '5');
+  step5OutputInitialized = false;
+
   applyLockStateToUI();
   tryAutoAssignFixedSeats();
   syncStateToWindow();
+}
+
+/* ========== Step UI (lazy render) ========== */
+
+function isStepActive(step) {
+  return $(`#step-${step}`)?.classList.contains('active');
+}
+
+function invalidateSteps(...steps) {
+  steps.forEach(s => {
+    stepUIReady[s] = false;
+    if (s === '4') placementEditorDirty = true;
+    if (s === '5') step5PreviewStale = true;
+  });
+}
+
+function renderStep1UI() {
+  renderExamDates();
+  renderUnifiedTimetable();
+  renderMovementRules();
+  renderMovementPreviewSelect();
+  renderSeatConfigPreview();
+  renderRoomsGradeSetup();
+  renderRoomsList();
+  stepUIReady['1'] = true;
+}
+
+function renderStep2UI() {
+  renderStudentSummary();
+  renderSubjectStats();
+  renderStudentList();
+  stepUIReady['2'] = true;
+}
+
+function renderStep3UI() {
+  populateExamGroupFilters();
+  renderExamGroupsTable();
+  renderRoomOccupancyPanel();
+  stepUIReady['3'] = true;
+}
+
+function touchStepUI(step, renderFn) {
+  if (isStepActive(step)) {
+    renderFn();
+    stepUIReady[step] = true;
+  } else {
+    invalidateSteps(step);
+  }
+}
+
+function ensureStepUI(step) {
+  const s = String(step);
+  if (stepUIReady[s]) {
+    if (s === '5' && step5PreviewStale) {
+      refreshOutputFilters();
+      refreshOutputPreview();
+      step5PreviewStale = false;
+    }
+    return;
+  }
+  switch (s) {
+    case '1':
+      renderStep1UI();
+      break;
+    case '2':
+      renderStep2UI();
+      break;
+    case '3':
+      renderStep3UI();
+      break;
+    case '4':
+      initPlacementEditor();
+      stepUIReady['4'] = true;
+      break;
+    case '5':
+      initStep5Output();
+      stepUIReady['5'] = true;
+      step5PreviewStale = false;
+      break;
+    default:
+      break;
+  }
 }
 
 /* ========== Navigation ========== */
@@ -5434,15 +5530,14 @@ function initStepNav() {
   $$('.step-tab').forEach(tab => {
     tab.addEventListener('click', () => {
       const step = tab.dataset.step;
-      $$('.step-tab').forEach(t => t.classList.remove('active'));
+      $$('.step-tab').forEach(t => {
+        const on = t === tab;
+        t.classList.toggle('active', on);
+        t.setAttribute('aria-selected', on ? 'true' : 'false');
+      });
       $$('.step-panel').forEach(p => p.classList.remove('active'));
-      tab.classList.add('active');
       $(`#step-${step}`).classList.add('active');
-      if (step === '4') {
-        if (placementEditorDirty) initPlacementEditor();
-        else requestAnimationFrame(() => renderPlacementValidationBanner());
-      }
-      if (step === '5') initStep5Output();
+      ensureStepUI(step);
     });
   });
 }
@@ -5476,8 +5571,9 @@ function initEvents() {
     renderMovementPreview();
   });
   $('#movement-rules-container').addEventListener('input', () => {
-    saveMovementRules();
-    renderMovementPreview();
+    collectMovementRulesFromDOM();
+    clearTimeout(movementPreviewDebounce);
+    movementPreviewDebounce = setTimeout(renderMovementPreview, 120);
   });
   $('#movement-preview-select')?.addEventListener('change', renderMovementPreview);
   ['#seat-rows', '#seat-cols', '#seat-fill-direction', '#seat-move-column', '#seat-door-side'].forEach(sel => {
@@ -5487,7 +5583,10 @@ function initEvents() {
       renderSeatConfigPreview();
       saveSeatDefaults();
     });
-    el.addEventListener('input', renderSeatConfigPreview);
+    el.addEventListener('input', () => {
+      clearTimeout(seatPreviewDebounce);
+      seatPreviewDebounce = setTimeout(renderSeatConfigPreview, 120);
+    });
   });
 
   $('#rooms-setup-grid')?.addEventListener('click', e => {
@@ -5554,7 +5653,6 @@ function initEvents() {
       const printSpan = e.target.parentElement?.querySelector('.print-only-note');
       if (printSpan) printSpan.textContent = e.target.value;
       syncStateToWindow();
-      refreshOutputPreview();
     }
   });
 
@@ -5598,23 +5696,14 @@ function init() {
 
   const loaded = tryLoadLocalOnInit();
   if (!loaded) {
-    renderExamDates();
-    renderUnifiedTimetable();
-    renderMovementRules();
-    renderMovementPreview();
-    renderSeatConfigPreview();
-    renderRoomsGradeSetup();
-    renderRoomsList();
-    renderStudentSummary();
-    renderStudentList();
-    renderSubjectStats();
-    renderRoomOccupancyPanel();
+    renderStep1UI();
+  } else {
+    stepUIReady['1'] = true;
   }
 
   initStepNav();
   initEvents();
   initPlacementEditorEvents();
-  initStep5Output();
   applyLockStateToUI();
   autoSavePaused = false;
   window.examFlowState = appState;
