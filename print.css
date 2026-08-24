@@ -22,6 +22,9 @@
   }
 
   .app-header,
+  .app-sidebar,
+  .app-mobile-bar,
+  .sidebar-backdrop,
   .privacy-notice,
   .step-nav,
   .step-panel:not(#step-5),

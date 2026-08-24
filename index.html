@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="color-scheme" content="light">
   <title>Exam Flow - 정기시험 운영 출력물 생성</title>
-  <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
   <link rel="stylesheet" href="style.css">
   <link rel="stylesheet" href="print.css">
   <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
@@ -15,68 +15,93 @@
 </head>
 <body>
   <div class="app-shell">
-    <p class="hero-copyright no-print">
-      <span>© 2026 Exam Flow</span>
-      <span class="hero-copyright__sep" aria-hidden="true"></span>
-      <span>made by 경기 이솔고등학교 교사 이왕혁</span>
-    </p>
-
-    <header class="hero card">
-      <p class="hero-badge">📋 정기시험 운영 플랫폼</p>
-      <h1 class="hero-title">
-        <span class="hero-title-emoji" aria-hidden="true">🎓</span>
-        Exam Flow
-      </h1>
-      <p class="hero-desc">정기시험 운영에 필요한 다양한 자료들을 출력하고 관리하는 업무 플랫폼</p>
-    </header>
-
-    <nav class="tab-nav-wrap ef-nav-under-hero" aria-label="단계 이동">
-      <div class="tab-nav-row">
-        <div class="step-nav tab-nav" id="step-nav" role="tablist">
-          <button type="button" class="step-tab tab" data-step="office" role="tab" aria-selected="false">
-            <span class="step-tab-label">관리실</span>
-            <span class="step-tab-status" aria-hidden="true"></span>
-          </button>
-          <button type="button" class="step-tab tab active" data-step="1" role="tab" aria-selected="true">
-            <span class="step-tab-label">① 운영설정</span>
-            <span class="step-tab-status" aria-hidden="true"></span>
-          </button>
-          <button type="button" class="step-tab tab" data-step="2" role="tab" aria-selected="false">
-            <span class="step-tab-label">② 학생업로드</span>
-            <span class="step-tab-status" aria-hidden="true"></span>
-          </button>
-          <button type="button" class="step-tab tab" data-step="3" role="tab" aria-selected="false">
-            <span class="step-tab-label">③ 시험실배정</span>
-            <span class="step-tab-status" aria-hidden="true"></span>
-          </button>
-          <button type="button" class="step-tab tab" data-step="4" role="tab" aria-selected="false">
-            <span class="step-tab-label">④ 자료검증</span>
-            <span class="step-tab-status" aria-hidden="true"></span>
-          </button>
-          <button type="button" class="step-tab tab" data-step="5" role="tab" aria-selected="false">
-            <span class="step-tab-label">⑤ 출력</span>
-            <span class="step-tab-status" aria-hidden="true"></span>
-          </button>
+    <div class="sidebar-backdrop no-print" id="sidebar-backdrop" hidden></div>
+    <aside class="app-sidebar no-print" id="app-sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-mark" aria-hidden="true">🎓</span>
+        <div>
+          <p class="brand-title">Exam Flow</p>
+          <p class="brand-tagline">정기시험 운영 · 출력물</p>
         </div>
       </div>
-    </nav>
+      <nav class="sidebar-nav" id="step-nav" aria-label="작업 순서" role="tablist">
+        <p class="sidebar-label">작업 순서</p>
+        <button type="button" class="step-tab nav-item active" data-step="1" role="tab" aria-selected="true">
+          <span class="sidebar-step-num">1</span>
+          <span aria-hidden="true">⚙️</span>
+          <span class="step-tab-label">운영설정</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="step-tab nav-item" data-step="2" role="tab" aria-selected="false">
+          <span class="sidebar-step-num">2</span>
+          <span aria-hidden="true">📤</span>
+          <span class="step-tab-label">학생업로드</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="step-tab nav-item" data-step="3" role="tab" aria-selected="false">
+          <span class="sidebar-step-num">3</span>
+          <span aria-hidden="true">🏫</span>
+          <span class="step-tab-label">시험실배정</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="step-tab nav-item" data-step="4" role="tab" aria-selected="false">
+          <span class="sidebar-step-num">4</span>
+          <span aria-hidden="true">✅</span>
+          <span class="step-tab-label">자료검증</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="step-tab nav-item" data-step="5" role="tab" aria-selected="false">
+          <span class="sidebar-step-num">5</span>
+          <span aria-hidden="true">🖨️</span>
+          <span class="step-tab-label">출력</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+        <p class="sidebar-label sidebar-label--util">관리</p>
+        <button type="button" class="step-tab nav-item" data-step="office" role="tab" aria-selected="false">
+          <span class="sidebar-step-num" aria-hidden="true"></span>
+          <span aria-hidden="true">🏢</span>
+          <span class="step-tab-label">관리실</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+      </nav>
+      <div class="sidebar-tools">
+        <span id="save-status" class="sync-chip">💾 저장됨</span>
+        <div class="sidebar-tool-btns">
+          <button type="button" id="btn-save-local" class="btn btn-ghost btn-sm">저장</button>
+          <button type="button" id="btn-load-local" class="btn btn-secondary btn-sm">불러오기</button>
+        </div>
+      </div>
+    </aside>
 
-    <main class="main-content tab-panels">
+    <div class="app-main-column">
+      <header class="app-mobile-bar no-print">
+        <button type="button" class="sidebar-toggle" id="btn-sidebar-toggle" aria-label="작업 순서 열기" aria-controls="app-sidebar" aria-expanded="false">☰</button>
+        <div class="mobile-bar-brand">
+          <span class="brand-title">Exam Flow</span>
+          <span class="mobile-bar-step" id="mobile-current-step">운영설정</span>
+        </div>
+        <div class="mobile-bar-actions">
+          <button type="button" id="btn-save-local-mobile" class="btn btn-ghost btn-sm">저장</button>
+        </div>
+      </header>
+
+    <main class="main main-content tab-panels animate-fade-in">
     <!-- 관리실 -->
     <section id="step-office" class="step-panel tab-panel">
-      <div class="card section-card">
-        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🗂️</span> 관리실</h2>
-        <p class="hint">작업 저장, 백업, 템플릿 및 데이터 초기화를 관리합니다. 입력 내용은 자동으로 이 PC에 저장됩니다.</p>
-
-        <div class="office-action-group">
-          <h3 class="card__title card__title--sub">작업 저장·불러오기</h3>
-          <div class="office-actions">
-            <button type="button" id="btn-save-local" class="btn btn-primary">작업 저장</button>
-            <button type="button" id="btn-load-local" class="btn btn-secondary">작업 불러오기</button>
-          </div>
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">
+            <span class="page-emoji" aria-hidden="true">🏢</span>
+            <span>관리실</span>
+          </h1>
+          <p class="page-desc">백업·템플릿·초기화를 관리합니다. 입력 내용은 이 PC에 자동 저장됩니다.</p>
         </div>
+      </div>
+      <div class="card section-card">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🗂️</span> 데이터 관리</h2>
+        <p class="hint">왼쪽 사이드바의 저장·불러오기로 작업을 관리할 수 있습니다. 아래는 템플릿·백업·초기화입니다.</p>
 
-        <div class="office-action-group">
+        <div class="office-action-group office-action-group--first">
           <h3 class="card__title card__title--sub">설정 템플릿</h3>
           <p class="hint office-hint">시험 규칙·고사실 설정만 저장합니다. 학생 데이터는 포함되지 않습니다.</p>
           <div class="office-actions">
@@ -119,6 +144,15 @@
 
     <!-- Step 1 -->
     <section id="step-1" class="step-panel tab-panel active">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">
+            <span class="page-emoji" aria-hidden="true">⚙️</span>
+            <span>운영설정</span>
+          </h1>
+          <p class="page-desc">학교·시험 기본 정보, 시간표, 이동 방식, 좌석·고사실을 설정합니다.</p>
+        </div>
+      </div>
       <div class="card section-card">
         <h2 class="card__title"><span class="card-icon" aria-hidden="true">🏫</span> 학교 정보</h2>
         <p class="hint">출력물 상단에 학교명이 표시됩니다. 학년도·학기는 아래 시험 기본 정보를 따릅니다.</p>
@@ -154,6 +188,7 @@
 
       <div class="card section-card">
         <h2 class="card__title"><span class="card-icon" aria-hidden="true">🧭</span> 학년별 이동 방식</h2>
+        <p class="hint">학년마다 이동 교실과 대상을 정합니다. 앞·뒷번호부터 인원만 넣거나, 시작 번호부터 N명, 번호 범위를 직접 지정할 수 있습니다. 결번은 건너뛰고 목표 인원만큼 선택합니다.</p>
         <div id="movement-rules-container"></div>
         <div class="movement-preview-picker">
           <label>이동 대상 미리보기
@@ -203,27 +238,42 @@
 
     <!-- Step 2 -->
     <section id="step-2" class="step-panel tab-panel">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">
+            <span class="page-emoji" aria-hidden="true">📤</span>
+            <span>학생업로드</span>
+          </h1>
+          <p class="page-desc">나이스 학생편성현황을 업로드하고 수강 과목을 확인합니다.</p>
+        </div>
+      </div>
       <div class="card section-card">
         <h2 class="card__title"><span class="card-icon" aria-hidden="true">📤</span> 나이스 학생편성현황 업로드</h2>
         <p class="hint">나이스에서 다운로드한 학생편성현황 엑셀 파일을 학년별로 업로드하세요. 파일은 브라우저에서만 파싱됩니다.</p>
         <p class="hint"><strong>다운로드 경로:</strong> 나이스 → 시간표 → 편제및과목개설관리 → 수강생편성 → 학년설정 후 조회 → 학생편성현황 → 엑셀출력 → 엑셀파일 다운로드</p>
         <p class="hint">성명 앞에 (미재학)이 붙은 학생은 현재 재학생이 아니므로 자동 제외됩니다.</p>
         <div class="upload-grid">
-          <div class="upload-box">
-            <h3>1학년</h3>
-            <input type="file" id="upload-grade-1" accept=".xlsx,.xls,.xlsm">
+          <label class="upload-box" for="upload-grade-1">
+            <span class="upload-emoji" aria-hidden="true">📄</span>
+            <span class="upload-title">1학년</span>
+            <span class="upload-meta">엑셀 파일을 선택하세요</span>
             <span class="upload-status" id="status-grade-1">미업로드</span>
-          </div>
-          <div class="upload-box">
-            <h3>2학년</h3>
-            <input type="file" id="upload-grade-2" accept=".xlsx,.xls,.xlsm">
+            <input type="file" id="upload-grade-1" accept=".xlsx,.xls,.xlsm">
+          </label>
+          <label class="upload-box" for="upload-grade-2">
+            <span class="upload-emoji" aria-hidden="true">📄</span>
+            <span class="upload-title">2학년</span>
+            <span class="upload-meta">엑셀 파일을 선택하세요</span>
             <span class="upload-status" id="status-grade-2">미업로드</span>
-          </div>
-          <div class="upload-box">
-            <h3>3학년</h3>
-            <input type="file" id="upload-grade-3" accept=".xlsx,.xls,.xlsm">
+            <input type="file" id="upload-grade-2" accept=".xlsx,.xls,.xlsm">
+          </label>
+          <label class="upload-box" for="upload-grade-3">
+            <span class="upload-emoji" aria-hidden="true">📄</span>
+            <span class="upload-title">3학년</span>
+            <span class="upload-meta">엑셀 파일을 선택하세요</span>
             <span class="upload-status" id="status-grade-3">미업로드</span>
-          </div>
+            <input type="file" id="upload-grade-3" accept=".xlsx,.xls,.xlsm">
+          </label>
         </div>
         <div id="upload-errors" class="error-box hidden"></div>
         <div id="student-summary" class="summary-grid upload-summary"></div>
@@ -258,6 +308,15 @@
 
     <!-- Step 3 -->
     <section id="step-3" class="step-panel tab-panel">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">
+            <span class="page-emoji" aria-hidden="true">🏫</span>
+            <span>시험실배정</span>
+          </h1>
+          <p class="page-desc">시험 일정을 생성하고 교실·좌석 배치를 확인합니다.</p>
+        </div>
+      </div>
       <div class="card section-card">
         <h2 class="card__title"><span class="card-icon" aria-hidden="true">⚙️</span> 시험 일정 생성</h2>
         <p class="hint">Step 1 시험 시간표와 Step 2 학생 데이터를 연결하여 학생별 시험 일정과 과목별 응시자 목록을 생성합니다.</p>
@@ -267,6 +326,7 @@
 
       <div class="card section-card">
         <h2 class="card__title"><span class="card-icon" aria-hidden="true">📝</span> 교시별 과목 응시자</h2>
+        <p class="hint">요약만 표시합니다. 학생별 좌석·고사실은 아래 교실 배치와 자료검증에서 확인하세요.</p>
         <div class="filter-row">
           <label>학년 <select id="exam-group-grade-filter"><option value="">전체</option></select></label>
           <label>일차 <select id="exam-group-day-filter"><option value="">전체</option></select></label>
@@ -290,9 +350,18 @@
 
     <!-- Step 4 — 자료검증 -->
     <section id="step-4" class="step-panel tab-panel">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">
+            <span class="page-emoji" aria-hidden="true">✅</span>
+            <span>자료검증</span>
+          </h1>
+          <p class="page-desc">시험실·좌석번호를 최종 확인하고 수정합니다. 변경 사항은 출력물에 반영됩니다.</p>
+        </div>
+      </div>
       <div class="card section-card">
-        <h2 class="card__title"><span class="card-icon" aria-hidden="true">📋</span> 자료검증</h2>
-        <p class="hint">시험실·좌석번호를 최종 확인하고 수정합니다. 변경 사항은 출력물에 반영됩니다.</p>
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">📋</span> 시험실·좌석 확인</h2>
+        <p class="hint">교실별로 배치를 검토하고 일괄 변경할 수 있습니다.</p>
         <div id="placement-validation-banner" class="placement-validation-banner"></div>
 
         <div class="placement-data-panel">
@@ -334,6 +403,15 @@
 
     <!-- Step 5 -->
     <section id="step-5" class="step-panel tab-panel">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">
+            <span class="page-emoji" aria-hidden="true">🖨️</span>
+            <span>출력</span>
+          </h1>
+          <p class="page-desc">운영 진단 후 좌석배치도·결시현황표 등 출력물을 인쇄하거나 PDF로 저장합니다.</p>
+        </div>
+      </div>
       <div id="output-validation-banner" class="output-validation-banner"></div>
 
       <div class="step5-top-bar no-print">
@@ -523,14 +601,25 @@
     </section>
   </main>
 
-    <footer class="app-footer">
-      <p>Exam Flow v0.9 — 모든 데이터는 <code>window.examFlowState</code>에서 확인할 수 있습니다.</p>
+    <footer class="app-footer no-print">
+      <p class="footer-copyright">
+        <span>© 2026 Exam Flow</span>
+        <span class="footer-copyright__sep" aria-hidden="true"></span>
+        <span>made by 경기 이솔고등학교 교사 이왕혁</span>
+      </p>
+      <p class="footer-meta">Exam Flow v0.9 — 데이터는 이 PC에만 저장됩니다.</p>
     </footer>
+    </div>
   </div>
 
   <div id="bulk-export-stage" class="bulk-export-stage" aria-hidden="true"></div>
 
-  <script src="script.js"></script>
+  <script src="js/core.js"></script>
+  <script src="js/students.js"></script>
+  <script src="js/assignment.js"></script>
+  <script src="js/placement.js"></script>
+  <script src="js/outputs.js"></script>
+  <script src="js/app.js"></script>
   <script src="ui-present.js"></script>
 </body>
 </html>
