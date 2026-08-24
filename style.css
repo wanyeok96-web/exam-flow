@@ -528,7 +528,7 @@ code {
 
 .meta-fields-row > label { flex: 1 1 100px; max-width: 160px; }
 .seat-config-row > label { flex: 1 1 130px; max-width: 180px; }
-.movement-fields-row > label { flex: 1 1 140px; max-width: 200px; }
+.movement-fields-row > label { flex: 1 1 100%; max-width: none; }
 
 label {
   display: flex;
@@ -752,20 +752,33 @@ input:focus, select:focus, textarea:focus {
   background: #f8fafc;
 }
 
+.movement-rules-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  align-items: stretch;
+  margin-bottom: 4px;
+}
+
 .movement-grade-block {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  height: 100%;
   border: 1px solid var(--line);
   border-radius: var(--radius-card);
   padding: 16px;
-  margin-bottom: 12px;
   background: #fff;
 }
 
 .movement-grade-head {
   display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 12px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   margin-bottom: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--line);
 }
 
 .movement-grade-head h3 {
@@ -783,6 +796,13 @@ input:focus, select:focus, textarea:focus {
   font-weight: 600;
   color: var(--ink);
   margin: 0;
+}
+
+.movement-grade-body {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-width: 0;
 }
 
 .movement-grade-block:not(.is-enabled) .movement-grade-body {
@@ -867,8 +887,8 @@ input:focus, select:focus, textarea:focus {
 }
 
 .move-mode-tabs {
-  display: flex;
-  flex-wrap: wrap;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
   gap: 4px;
   margin-bottom: 12px;
 }
@@ -877,8 +897,9 @@ input:focus, select:focus, textarea:focus {
   position: relative;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   margin: 0;
-  padding: 6px 12px;
+  padding: 6px 8px;
   border-radius: var(--radius-ctrl);
   background: transparent;
   color: var(--muted);
@@ -887,6 +908,7 @@ input:focus, select:focus, textarea:focus {
   cursor: pointer;
   flex-direction: row;
   gap: 0;
+  text-align: center;
 }
 
 .move-mode-tab input {
@@ -922,6 +944,12 @@ input:focus, select:focus, textarea:focus {
   width: 4.5rem;
   text-align: center;
   font-weight: 600;
+}
+
+@media (max-width: 720px) {
+  .movement-rules-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .movement-preview-picker {
