@@ -1,0 +1,734 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="color-scheme" content="light">
+  <title>Exam Flow - 정기시험 운영 출력물 생성</title>
+  <link rel="stylesheet" as="style" crossorigin href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.min.css">
+  <link rel="stylesheet" href="style.css">
+  <link rel="stylesheet" href="guide.css">
+  <link rel="stylesheet" href="print.css">
+  <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+</head>
+<body>
+  <div class="app-shell">
+    <div class="sidebar-backdrop no-print" id="sidebar-backdrop" hidden></div>
+    <aside class="app-sidebar no-print" id="app-sidebar">
+      <div class="sidebar-brand">
+        <span class="brand-mark" aria-hidden="true">🎓</span>
+        <div>
+          <p class="brand-title">Exam Flow</p>
+          <p class="brand-tagline">정기시험 운영 · 출력물</p>
+        </div>
+      </div>
+      <nav class="sidebar-nav" id="step-nav" aria-label="프로그램 메뉴" role="tablist">
+        <p class="sidebar-label">프로그램 소개</p>
+        <button type="button" class="step-tab nav-item" data-step="guide" role="tab" aria-selected="false">
+          <span class="sidebar-step-num" aria-hidden="true"></span>
+          <span aria-hidden="true">📘</span>
+          <span class="step-tab-label">가이드</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+        <p class="sidebar-label sidebar-label--work">작업 순서</p>
+        <button type="button" class="step-tab nav-item active" data-step="1" role="tab" aria-selected="true">
+          <span class="sidebar-step-num">1</span>
+          <span aria-hidden="true">⚙️</span>
+          <span class="step-tab-label">운영설정</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="step-tab nav-item" data-step="2" role="tab" aria-selected="false">
+          <span class="sidebar-step-num">2</span>
+          <span aria-hidden="true">📤</span>
+          <span class="step-tab-label">학생업로드</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="step-tab nav-item" data-step="3" role="tab" aria-selected="false">
+          <span class="sidebar-step-num">3</span>
+          <span aria-hidden="true">🏫</span>
+          <span class="step-tab-label">시험실배정</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="step-tab nav-item" data-step="4" role="tab" aria-selected="false">
+          <span class="sidebar-step-num">4</span>
+          <span aria-hidden="true">✅</span>
+          <span class="step-tab-label">자료검증</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+        <button type="button" class="step-tab nav-item" data-step="5" role="tab" aria-selected="false">
+          <span class="sidebar-step-num">5</span>
+          <span aria-hidden="true">🖨️</span>
+          <span class="step-tab-label">출력</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+        <p class="sidebar-label sidebar-label--util">관리</p>
+        <button type="button" class="step-tab nav-item" data-step="office" role="tab" aria-selected="false">
+          <span class="sidebar-step-num" aria-hidden="true"></span>
+          <span aria-hidden="true">🏢</span>
+          <span class="step-tab-label">관리실</span>
+          <span class="step-tab-status" aria-hidden="true"></span>
+        </button>
+      </nav>
+      <div class="sidebar-tools">
+        <span id="save-status" class="sync-chip">💾 저장됨</span>
+        <div class="sidebar-tool-btns">
+          <button type="button" id="btn-save-local" class="btn btn-ghost btn-sm">저장</button>
+          <button type="button" id="btn-load-local" class="btn btn-secondary btn-sm">불러오기</button>
+        </div>
+      </div>
+    </aside>
+
+    <div class="app-main-column">
+      <header class="app-mobile-bar no-print">
+        <button type="button" class="sidebar-toggle" id="btn-sidebar-toggle" aria-label="작업 순서 열기" aria-controls="app-sidebar" aria-expanded="false">☰</button>
+        <div class="mobile-bar-brand">
+          <span class="brand-title">Exam Flow</span>
+          <span class="mobile-bar-step" id="mobile-current-step">운영설정</span>
+        </div>
+        <div class="mobile-bar-actions">
+          <button type="button" id="btn-save-local-mobile" class="btn btn-ghost btn-sm">저장</button>
+        </div>
+      </header>
+
+    <main class="main main-content tab-panels animate-fade-in">
+    <!-- 가이드 -->
+    <section id="step-guide" class="step-panel tab-panel">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">
+            <span class="page-emoji" aria-hidden="true">📘</span>
+            <span>가이드</span>
+          </h1>
+          <p class="page-desc">Exam Flow는 나이스 학생편성현황으로 시험실·좌석·출력물을 한 번에 만드는 정기시험 운영 도구입니다. <strong>데이터는 이 PC에만 저장됩니다.</strong></p>
+        </div>
+      </div>
+      <div class="card section-card">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">✨</span> 이 프로그램으로 할 수 있는 일</h2>
+        <ul class="guide-list">
+          <li>학년별 이동 규칙과 고사실을 정합니다.</li>
+          <li>나이스 엑셀을 올려 응시 명단을 만듭니다.</li>
+          <li>교실·좌석을 자동 배정한 뒤 확인하고 고칩니다.</li>
+          <li>좌석배치도, 결시현황표, 개인 시간표 등을 인쇄하거나 PDF로 받습니다.</li>
+        </ul>
+      </div>
+      <div class="card section-card">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🔢</span> 권장 작업 순서</h2>
+        <ol class="guide-flow">
+          <li>
+            <div>
+              <strong>운영설정</strong>
+              <p>학교명, 시험 일정, 시간표, 학년별 이동 방식, 좌석 기본값, 고사실을 정합니다. 같은 교시에 선택과목이 여러 개면 <code>/</code>로 구분합니다.</p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" data-goto-step="1">이 단계로</button>
+          </li>
+          <li>
+            <div>
+              <strong>학생업로드</strong>
+              <p>나이스 학생편성현황을 학년별로 올립니다. 성명 앞 <code>(미재학)</code>은 자동으로 빠집니다.</p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" data-goto-step="2">이 단계로</button>
+          </li>
+          <li>
+            <div>
+              <strong>시험실배정</strong>
+              <p>시험 일정을 생성하면 본반 학생과 이동 학생이 교실에 나뉘어 들어가고 좌석이 부여됩니다.</p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" data-goto-step="3">이 단계로</button>
+          </li>
+          <li>
+            <div>
+              <strong>자료검증</strong>
+              <p>교실별로 좌석을 확인하고, 필요하면 시험실을 바꾸거나 별도시험실로 옮깁니다. 여기서 고친 내용이 출력물에 반영됩니다.</p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" data-goto-step="4">이 단계로</button>
+          </li>
+          <li>
+            <div>
+              <strong>출력</strong>
+              <p>운영 진단을 실행한 뒤 출력물을 고릅니다. 반별 출력물 zip으로 학년·반 폴더에 PDF를 한 번에 받을 수도 있습니다.</p>
+            </div>
+            <button type="button" class="btn btn-secondary btn-sm" data-goto-step="5">이 단계로</button>
+          </li>
+        </ol>
+      </div>
+      <div class="card section-card">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">💡</span> 처음 쓸 때 알아두면 좋은 점</h2>
+        <ul class="guide-list">
+          <li>선생님이 직접 입력하거나, 엑셀로 업로드한 모든 정보들은, 선생님의 컴퓨터에만 저장됩니다.</li>
+          <li>왼쪽 아래 <strong>저장 / 불러오기</strong>로 이 PC에 작업을 보관합니다. 입력 내용은 자동 저장됩니다.</li>
+          <li><strong>설정 템플릿</strong>은 시험 규칙·고사실만 담고, <strong>운영 백업</strong>은 학생 데이터까지 포함합니다.</li>
+          <li>각 작업 화면 제목 오른쪽 <strong>튜토리얼</strong>을 누르면, 그 화면의 카드를 순서대로 안내합니다.</li>
+          <li>출력 전에 <strong>운영 진단</strong>을 한 번 실행하는 것을 권장합니다.</li>
+        </ul>
+        <p class="hint guide-nice-path"><strong>나이스 파일 경로:</strong> 나이스 → 시간표 → 편제및과목개설관리 → 수강생편성 → 학년 설정 후 조회 → 학생편성현황 → 엑셀출력</p>
+      </div>
+    </section>
+
+    <!-- 관리실 -->
+    <section id="step-office" class="step-panel tab-panel">
+      <div class="page-header">
+        <div>
+          <h1 class="page-title">
+            <span class="page-emoji" aria-hidden="true">🏢</span>
+            <span>관리실</span>
+          </h1>
+          <p class="page-desc">백업·템플릿·초기화를 관리합니다. 입력 내용은 이 PC에 자동 저장됩니다.</p>
+        </div>
+      </div>
+      <div class="card section-card">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🗂️</span> 데이터 관리</h2>
+        <p class="hint">왼쪽 사이드바의 저장·불러오기로 작업을 관리할 수 있습니다. 아래는 템플릿·백업·초기화입니다.</p>
+
+        <div class="office-action-group office-action-group--first">
+          <h3 class="card__title card__title--sub">설정 템플릿</h3>
+          <p class="hint office-hint">시험 규칙·고사실 설정만 저장합니다. 학생 데이터는 포함되지 않습니다.</p>
+          <div class="office-actions">
+            <button type="button" id="btn-export-template" class="btn btn-secondary">설정 템플릿 저장</button>
+            <label class="btn btn-secondary file-label">
+              설정 템플릿 불러오기
+              <input type="file" id="btn-import-template" accept=".json" hidden>
+            </label>
+          </div>
+        </div>
+
+        <div class="office-action-group">
+          <h3 class="card__title card__title--sub">운영 백업</h3>
+          <p class="hint office-hint">학생 데이터를 포함한 전체 운영 상태를 백업합니다.</p>
+          <div class="office-actions">
+            <button type="button" id="btn-export-operation-backup" class="btn btn-secondary">운영 백업</button>
+          </div>
+        </div>
+
+        <div class="office-action-group">
+          <h3 class="card__title card__title--sub">JSON 백업</h3>
+          <div class="office-actions">
+            <button type="button" id="btn-export-json" class="btn btn-secondary">JSON 백업</button>
+            <label class="btn btn-secondary file-label">
+              JSON 불러오기
+              <input type="file" id="input-import-json" accept=".json" hidden>
+            </label>
+          </div>
+        </div>
+
+        <div class="office-action-group office-action-group--danger">
+          <h3 class="card__title card__title--sub">데이터 초기화</h3>
+          <p class="hint office-hint">모든 데이터와 저장된 작업을 삭제합니다. 되돌릴 수 없습니다.</p>
+          <div class="office-actions">
+            <button type="button" id="btn-reset-all" class="btn btn-danger">전체 초기화</button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Step 1 -->
+    <section id="step-1" class="step-panel tab-panel active">
+      <div class="page-header">
+        <div>
+          <div class="page-title-row">
+            <h1 class="page-title">
+              <span class="page-emoji" aria-hidden="true">⚙️</span>
+              <span>운영설정</span>
+            </h1>
+            <button type="button" class="btn btn-secondary btn-sm btn-page-tour no-print" data-tour="1">튜토리얼</button>
+          </div>
+          <p class="page-desc">학교·시험 기본 정보, 시간표, 이동 방식, 좌석·고사실을 설정합니다.</p>
+        </div>
+      </div>
+      <div class="card section-card" data-tour-title="학교 정보" data-tour-body="출력물 상단에 표시할 학교명을 입력합니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🏫</span> 학교 정보</h2>
+        <p class="hint">출력물 상단에 학교명이 표시됩니다. 학년도·학기는 아래 시험 기본 정보를 따릅니다.</p>
+        <div class="form-grid">
+          <label class="span-2">학교명 <input type="text" id="meta-school-name" placeholder="예: 이솔고등학교"></label>
+        </div>
+      </div>
+
+      <div class="card section-card" data-tour-title="시험 기본 정보" data-tour-body="학년도·학기·차수·고사명·시험 일수·교시 수를 정한 뒤 「기본 정보 적용」을 누릅니다. 시험 날짜도 여기서 넣습니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">📅</span> 시험 기본 정보</h2>
+        <div class="form-inline-row meta-fields-row">
+          <label>학년도 <input type="number" id="meta-year" value="2026" min="2000"></label>
+          <label>학기
+            <select id="meta-semester"><option value="1">1학기</option><option value="2">2학기</option></select>
+          </label>
+          <label>차수
+            <select id="meta-round"><option value="1">1차</option><option value="2">2차</option></select>
+          </label>
+          <label>고사명 <input type="text" id="meta-exam-name" value="정기시험"></label>
+          <label>시험 일수 <input type="number" id="meta-days" value="4" min="1" max="10"></label>
+          <label>하루 교시 수 <input type="number" id="meta-periods" value="3" min="1" max="6"></label>
+        </div>
+        <div id="exam-dates-container" class="exam-dates-row"></div>
+        <button type="button" id="btn-apply-meta" class="btn btn-primary">기본 정보 적용</button>
+      </div>
+
+      <div class="card section-card" data-tour-title="시험 시간표" data-tour-body="학년·일차·교시별 과목을 입력합니다. 같은 교시에 선택과목이 여러 개면 슬래시(/)로 구분하세요.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🗓️</span> 시험 시간표</h2>
+        <p class="hint">같은 교시에 여러 선택과목이 있으면 <code>/</code>로 구분해 입력하세요. (예: 기하 / 영어권 문화)</p>
+        <div id="timetable-container"></div>
+        <button type="button" id="btn-save-timetable" class="btn btn-primary">시간표 저장</button>
+      </div>
+
+      <div class="card section-card" data-tour-title="학년별 이동 방식" data-tour-body="학년마다 이동할 교실과 대상을 정합니다. 앞번호부터·뒷번호부터·번호부터 N명·번호 범위 중 하나를 고르면 아래 안내 문장이 바뀝니다. 결번은 건너뛰고 목표 인원만큼 선택합니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🧭</span> 학년별 이동 방식</h2>
+        <p class="hint hint-nowrap">학년마다 이동 교실과 대상을 정합니다. 앞·뒷번호부터 인원만 넣거나, 시작 번호부터 N명, 번호 범위를 직접 지정할 수 있습니다. 결번은 건너뛰고 목표 인원만큼 선택합니다.</p>
+        <div id="movement-rules-container" class="movement-rules-grid"></div>
+        <div class="movement-preview-picker">
+          <label>이동 대상 미리보기
+            <select id="movement-preview-select"><option value="">학년·반 선택</option></select>
+          </label>
+        </div>
+        <div id="movement-preview-container" class="movement-preview"></div>
+      </div>
+
+      <div class="card section-card" data-tour-title="좌석 배치 기본값" data-tour-body="교실 행·열, 채움 방향, 이동반이 앉을 열, 출입문 위치를 정합니다. 아래 미리보기로 배치를 확인할 수 있습니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🪑</span> 좌석 배치 기본값</h2>
+        <div class="form-inline-row seat-config-row">
+          <label>행 수 <input type="number" id="seat-rows" value="6" min="1"></label>
+          <label>열 수 <input type="number" id="seat-cols" value="4" min="1"></label>
+          <label>좌석 채움 방향
+            <select id="seat-fill-direction">
+              <option value="front-to-back">앞에서 뒤</option>
+              <option value="back-to-front">뒤에서 앞</option>
+              <option value="left-to-right">왼쪽에서 오른쪽</option>
+              <option value="right-to-left">오른쪽에서 왼쪽</option>
+            </select>
+          </label>
+          <label>이동반 열
+            <select id="seat-move-column">
+              <option value="even" selected>짝수열</option>
+              <option value="odd">홀수열</option>
+            </select>
+          </label>
+          <label>출입문 위치
+            <select id="seat-door-side">
+              <option value="left">좌측</option>
+              <option value="center">중앙</option>
+              <option value="right">우측</option>
+            </select>
+          </label>
+        </div>
+        <p class="hint seat-config-hint">교실(반): 본반·이동반 열을 나누어 배치하며, 좌석번호는 각각 1번부터 (열 단위 위→아래)</p>
+        <div id="seat-config-preview" class="seat-config-preview"></div>
+      </div>
+
+      <div class="card section-card" data-tour-title="고사실 목록" data-tour-body="학년별 학급 교실을 생성하고, 특별실·대기실을 추가합니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🏛️</span> 고사실 목록</h2>
+        <div id="rooms-setup-grid" class="rooms-setup-grid"></div>
+        <div id="rooms-list-container"></div>
+      </div>
+    </section>
+
+    <!-- Step 2 -->
+    <section id="step-2" class="step-panel tab-panel">
+      <div class="page-header">
+        <div>
+          <div class="page-title-row">
+            <h1 class="page-title">
+              <span class="page-emoji" aria-hidden="true">📤</span>
+              <span>학생업로드</span>
+            </h1>
+            <button type="button" class="btn btn-secondary btn-sm btn-page-tour no-print" data-tour="2">튜토리얼</button>
+          </div>
+          <p class="page-desc">나이스 학생편성현황을 업로드하고 수강 과목을 확인합니다.</p>
+        </div>
+      </div>
+      <div class="card section-card" data-tour-title="나이스 학생편성현황 업로드" data-tour-body="나이스에서 받은 학생편성현황 엑셀을 학년별로 올립니다. 성명 앞 (미재학)은 자동으로 제외됩니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">📤</span> 나이스 학생편성현황 업로드</h2>
+        <p class="hint">나이스에서 다운로드한 학생편성현황 엑셀 파일을 학년별로 업로드하세요. 파일은 브라우저에서만 파싱됩니다.</p>
+        <p class="hint hint-nowrap"><strong>다운로드 경로:</strong> 나이스 → 시간표 → 편제및과목개설관리 → 수강생편성 → 학년설정 후 조회 → 학생편성현황 → 엑셀출력 → 엑셀파일 다운로드</p>
+        <p class="hint">성명 앞에 (미재학)이 붙은 학생은 현재 재학생이 아니므로 자동 제외됩니다.</p>
+        <div class="upload-grid">
+          <label class="upload-box" for="upload-grade-1">
+            <span class="upload-emoji" aria-hidden="true">📄</span>
+            <span class="upload-title">1학년</span>
+            <span class="upload-meta">엑셀 파일을 선택하세요</span>
+            <span class="upload-status" id="status-grade-1">미업로드</span>
+            <input type="file" id="upload-grade-1" accept=".xlsx,.xls,.xlsm">
+          </label>
+          <label class="upload-box" for="upload-grade-2">
+            <span class="upload-emoji" aria-hidden="true">📄</span>
+            <span class="upload-title">2학년</span>
+            <span class="upload-meta">엑셀 파일을 선택하세요</span>
+            <span class="upload-status" id="status-grade-2">미업로드</span>
+            <input type="file" id="upload-grade-2" accept=".xlsx,.xls,.xlsm">
+          </label>
+          <label class="upload-box" for="upload-grade-3">
+            <span class="upload-emoji" aria-hidden="true">📄</span>
+            <span class="upload-title">3학년</span>
+            <span class="upload-meta">엑셀 파일을 선택하세요</span>
+            <span class="upload-status" id="status-grade-3">미업로드</span>
+            <input type="file" id="upload-grade-3" accept=".xlsx,.xls,.xlsm">
+          </label>
+        </div>
+        <div id="upload-errors" class="error-box hidden"></div>
+        <div id="student-summary" class="summary-grid upload-summary"></div>
+      </div>
+
+      <div class="card section-card" data-tour-title="학생별 수강 과목" data-tour-body="업로드된 학생 명렬입니다. 학년으로 걸러 보고, 필요하면 행 끝 휴지통으로 개별 학생을 삭제할 수 있습니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">👥</span> 학생별 수강 과목</h2>
+        <p class="hint">업로드된 학생 명렬입니다. 행 끝 휴지통 버튼으로 개별 학생을 삭제할 수 있습니다.</p>
+        <div class="filter-row">
+          <label>학년 필터
+            <select id="student-list-grade-filter"><option value="">전체</option><option value="1">1학년</option><option value="2">2학년</option><option value="3">3학년</option></select>
+          </label>
+        </div>
+        <div id="student-list-table" class="table-scroll"></div>
+      </div>
+
+      <div class="card section-card" data-tour-title="과목별 수강 현황" data-tour-body="학년을 고르면 과목별 수강 인원과 개설강의실을 확인할 수 있습니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">📚</span> 과목별 수강 현황</h2>
+        <div class="filter-row">
+          <label>학년
+            <select id="subject-stats-grade-filter">
+              <option value="">학년 선택</option>
+              <option value="1">1학년</option>
+              <option value="2">2학년</option>
+              <option value="3">3학년</option>
+            </select>
+          </label>
+        </div>
+        <div id="subject-stats-table"></div>
+      </div>
+    </section>
+
+    <!-- Step 3 -->
+    <section id="step-3" class="step-panel tab-panel">
+      <div class="page-header">
+        <div>
+          <div class="page-title-row">
+            <h1 class="page-title">
+              <span class="page-emoji" aria-hidden="true">🏫</span>
+              <span>시험실배정</span>
+            </h1>
+            <button type="button" class="btn btn-secondary btn-sm btn-page-tour no-print" data-tour="3">튜토리얼</button>
+          </div>
+          <p class="page-desc">시험 일정을 생성하고 교실·좌석 배치를 확인합니다.</p>
+        </div>
+      </div>
+      <div class="card section-card" data-tour-title="시험 일정 생성" data-tour-body="시간표와 학생 데이터를 연결해 학생별 시험 일정과 과목별 응시자 목록을 만듭니다. 이 화면에서는 먼저 이 버튼을 누르세요.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">⚙️</span> 시험 일정 생성</h2>
+        <p class="hint">Step 1 시험 시간표와 Step 2 학생 데이터를 연결하여 학생별 시험 일정과 과목별 응시자 목록을 생성합니다.</p>
+        <button type="button" id="btn-generate-schedules" class="btn btn-primary">시험 일정·응시자 생성</button>
+        <div id="schedule-gen-result" class="info-box hidden"></div>
+      </div>
+
+      <div class="card section-card" data-tour-title="교시별 과목 응시자" data-tour-body="생성된 일정의 요약입니다. 학생별 좌석·고사실은 아래 교실 배치와 자료검증에서 확인하세요.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">📝</span> 교시별 과목 응시자</h2>
+        <p class="hint">요약만 표시합니다. 학생별 좌석·고사실은 아래 교실 배치와 자료검증에서 확인하세요.</p>
+        <div class="filter-row">
+          <label>학년 <select id="exam-group-grade-filter"><option value="">전체</option></select></label>
+          <label>일차 <select id="exam-group-day-filter"><option value="">전체</option></select></label>
+        </div>
+        <div id="exam-groups-table" class="table-scroll"></div>
+      </div>
+
+      <div class="card section-card" data-tour-title="교실별 배치 현황" data-tour-body="본반 학생과 이동해 온 학생이 교실에 어떻게 나뉘는지 보여 줍니다. 과목별 고사실을 따로 고를 필요는 없습니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🏫</span> 교실별 배치 현황</h2>
+        <p class="hint">반=교실 원칙으로 본 반 학생(이동 제외)과 이동반 유입 학생이 자동 계산됩니다. 과목별 고사실 수동 배정은 필요 없습니다.</p>
+        <div id="room-occupancy-panel"></div>
+      </div>
+
+      <div class="card section-card" data-tour-title="고정 좌석 부여" data-tour-body="배치된 학생에게 좌석 번호를 줍니다. 일정 생성 때 자동으로 부여되며, 필요할 때만 「고정 좌석 재배정」을 누르세요.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🪑</span> 고정 좌석 부여</h2>
+        <p class="hint">각 교실에 배치된 학생(본 반·이동반)에게 좌석을 1회 부여합니다.<br>시험 일정 생성·페이지 불러오기 시 <strong>자동 배정</strong>되며, 필요할 때만 아래 버튼으로 재배정하세요.</p>
+        <button type="button" id="btn-assign-seats" class="btn btn-secondary">고정 좌석 재배정</button>
+        <div id="seat-assign-result" class="info-box hidden"></div>
+      </div>
+    </section>
+
+    <!-- Step 4 — 자료검증 -->
+    <section id="step-4" class="step-panel tab-panel">
+      <div class="page-header">
+        <div>
+          <div class="page-title-row">
+            <h1 class="page-title">
+              <span class="page-emoji" aria-hidden="true">✅</span>
+              <span>자료검증</span>
+            </h1>
+            <button type="button" class="btn btn-secondary btn-sm btn-page-tour no-print" data-tour="4">튜토리얼</button>
+          </div>
+          <p class="page-desc">시험실·좌석번호를 최종 확인하고 수정합니다. 변경 사항은 출력물에 반영됩니다.</p>
+        </div>
+      </div>
+      <div class="card section-card" data-tour-title="시험실·좌석 확인" data-tour-body="교실을 넘기며 좌석을 검토하고, 선택한 학생의 시험실을 일괄 변경할 수 있습니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">📋</span> 시험실·좌석 확인</h2>
+        <p class="hint">교실별로 배치를 검토하고 일괄 변경할 수 있습니다.</p>
+        <div id="placement-validation-banner" class="placement-validation-banner"></div>
+
+        <div class="placement-data-panel">
+          <div class="placement-table-header">
+            <div class="placement-header-left filter-row placement-filter-row" id="placement-filters"></div>
+            <div class="placement-header-center">
+              <div class="placement-room-nav">
+                <button type="button" id="placement-room-prev" class="btn btn-sm btn-secondary placement-room-arrow" aria-label="이전 교실">‹</button>
+                <span id="placement-room-label" class="placement-room-label">—</span>
+                <button type="button" id="placement-room-next" class="btn btn-sm btn-secondary placement-room-arrow" aria-label="다음 교실">›</button>
+              </div>
+            </div>
+            <div class="placement-header-right placement-bulk-actions">
+              <label class="filter-check placement-select-all"><input type="checkbox" id="placement-select-all"> 전체 선택</label>
+              <select id="bulk-room" class="bulk-select"><option value="">시험실</option></select>
+              <button type="button" id="btn-bulk-apply" class="btn btn-primary btn-sm">일괄 변경</button>
+            </div>
+          </div>
+          <div id="placement-table-wrap" class="placement-table-wrap"></div>
+        </div>
+      </div>
+
+      <div class="card section-card" data-tour-title="별도시험실 관리" data-tour-body="선택한 학생의 시험실을 별도시험실로 바꿉니다.">
+        <h3 class="card__title card__title--sub">별도시험실 관리</h3>
+        <p class="hint">선택한 학생의 시험실을 별도시험실로 변경합니다.</p>
+        <div class="filter-row">
+          <label>별도시험실
+            <select id="separate-room-select"></select>
+          </label>
+          <button type="button" id="btn-assign-separate-room" class="btn btn-secondary">선택 학생 별도시험실 배정</button>
+        </div>
+      </div>
+
+      <div class="card section-card" data-tour-title="자료검증 변경 이력" data-tour-body="이 화면에서 바꾼 시험실·좌석 기록이 남습니다.">
+        <h3 class="card__title card__title--sub">자료검증 변경 이력</h3>
+        <div id="placement-change-history" class="placement-change-history"></div>
+      </div>
+    </section>
+
+    <!-- Step 5 -->
+    <section id="step-5" class="step-panel tab-panel">
+      <div class="page-header">
+        <div>
+          <div class="page-title-row">
+            <h1 class="page-title">
+              <span class="page-emoji" aria-hidden="true">🖨️</span>
+              <span>출력</span>
+            </h1>
+            <button type="button" class="btn btn-secondary btn-sm btn-page-tour no-print" data-tour="5">튜토리얼</button>
+          </div>
+          <p class="page-desc">운영 진단 후 좌석배치도·결시현황표 등 출력물을 인쇄하거나 PDF로 저장합니다.</p>
+        </div>
+      </div>
+      <div id="output-validation-banner" class="output-validation-banner"></div>
+
+      <div class="step5-top-bar no-print">
+        <div id="operation-lock-status" class="operation-lock-status unlocked">🔓 수정 가능</div>
+        <div class="operation-lock-actions">
+          <button type="button" id="btn-lock-operation" class="btn btn-sm btn-primary">운영 확정</button>
+          <button type="button" id="btn-unlock-operation" class="btn btn-sm btn-danger" style="display:none">운영 잠금 해제</button>
+        </div>
+      </div>
+
+      <div class="card section-card operation-overview-card no-print" data-tour-title="시험 운영 현황·진단" data-tour-body="시험 운영 규모를 보고, 「운영 진단 실행」으로 오류·경고를 확인한 뒤 출력하세요. 문제가 없으면 위에서 운영 확정으로 잠글 수 있습니다.">
+        <div class="operation-overview-row">
+          <section class="operation-overview-section operation-dashboard" id="operation-dashboard">
+            <div class="operation-dashboard-header">
+              <h2 class="card__title"><span class="card-icon" aria-hidden="true">📊</span> 시험 운영 현황</h2>
+            </div>
+            <div id="operation-dashboard-stats" class="operation-dashboard-stats"></div>
+          </section>
+
+          <section class="operation-overview-section operation-diagnosis" id="operation-diagnosis">
+            <div class="operation-diagnosis-header">
+              <h2 class="card__title"><span class="card-icon" aria-hidden="true">🔍</span> 시험 운영 진단</h2>
+              <div class="operation-diagnosis-header-actions">
+                <span id="diagnosis-status-badge" class="diagnosis-status-badge pending">—</span>
+                <button type="button" id="btn-run-diagnosis" class="btn btn-sm btn-secondary">운영 진단 실행</button>
+              </div>
+            </div>
+            <div class="operation-diagnosis-summary-row">
+              <div id="diagnosis-summary-cards" class="diagnosis-summary-cards">
+                <div class="diag-summary-pill error">
+                  <span class="pill-value" id="diag-pill-error">—</span>
+                  <span class="pill-label">❌ 오류</span>
+                </div>
+                <div class="diag-summary-pill warning">
+                  <span class="pill-value" id="diag-pill-warning">—</span>
+                  <span class="pill-label">⚠ 경고</span>
+                </div>
+                <div class="diag-summary-pill ok">
+                  <span class="pill-value" id="diag-pill-ok">—</span>
+                  <span class="pill-label">✅ 정상</span>
+                </div>
+              </div>
+              <p id="diagnosis-summary" class="diagnosis-summary">「운영 진단 실행」을 클릭하세요.</p>
+            </div>
+            <div id="diagnosis-results-table" class="diagnosis-results-table"></div>
+          </section>
+        </div>
+      </div>
+
+      <div class="card section-card output-work-card output-work--indexed" id="output-work-card" data-tour-title="출력물" data-tour-body="좌석배치도, 결시현황표, 선택과목, 개인시간표, 시험실배정 중 하나를 고르고 미리보기·인쇄·PDF를 합니다.">
+        <div class="output-index-row" role="tablist" aria-label="출력물 선택">
+          <button type="button" class="output-index-tab is-active" role="tab" data-output="seat-map" aria-selected="true" aria-controls="output-panel-seat-map">좌석배치도</button>
+          <button type="button" class="output-index-tab" role="tab" data-output="attendance" aria-selected="false" aria-controls="output-panel-attendance">결시현황표</button>
+          <button type="button" class="output-index-tab" role="tab" data-output="elective-students" aria-selected="false" aria-controls="output-panel-elective-students">선택과목</button>
+          <button type="button" class="output-index-tab" role="tab" data-output="personal" aria-selected="false" aria-controls="output-panel-personal">개인시간표</button>
+          <button type="button" class="output-index-tab" role="tab" data-output="room-assignment" aria-selected="false" aria-controls="output-panel-room-assignment">시험실배정</button>
+        </div>
+
+        <div class="output-index-panel">
+          <div class="output-tab-body">
+            <div class="output-tab-panel active" id="output-panel-seat-map" data-output="seat-map" role="tabpanel">
+              <div class="output-tab-head">
+                <h3><span class="output-card-icon" aria-hidden="true">🪑</span> 좌석배치도</h3>
+                <div class="output-card-actions">
+                  <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="seat-map">인쇄</button>
+                  <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="seat-map">전체 PDF</button>
+                </div>
+              </div>
+              <p class="output-desc">교실별 고정 좌석 배치를 출력합니다. 칠판 부착용(교탁·앞쪽 상단)과 교탁 부착용(감독관 시점, 상하·좌우 반전) 중 선택할 수 있습니다.</p>
+              <div class="output-filters" id="filters-seat-map"></div>
+            </div>
+
+            <div class="output-tab-panel" id="output-panel-attendance" data-output="attendance" role="tabpanel" hidden>
+              <div class="output-tab-head">
+                <h3><span class="output-card-icon" aria-hidden="true">📋</span> 결시현황표</h3>
+                <div class="output-card-actions">
+                  <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="attendance">인쇄</button>
+                  <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="attendance">전체 PDF</button>
+                </div>
+              </div>
+              <p class="output-desc">교실·일차별 통합 응시현황표 (학급 구분, 교시별 응시현황)를 출력합니다.</p>
+              <div class="output-filters" id="filters-attendance"></div>
+            </div>
+
+            <div class="output-tab-panel" id="output-panel-elective-students" data-output="elective-students" role="tabpanel" hidden>
+              <div class="output-tab-head">
+                <h3><span class="output-card-icon" aria-hidden="true">📌</span> 선택과목 응시 학생</h3>
+                <div class="output-card-actions">
+                  <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="elective-students">인쇄</button>
+                  <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="elective-students">전체 PDF</button>
+                </div>
+              </div>
+              <p class="output-desc">고사실별·학년별·일차·교시·과목별 선택과목 응시 학생 명단 — 이동 학생이 있는 고사실은 학년마다 별도 표 (B4 가로, 교실 부착용)</p>
+              <div class="output-filters" id="filters-elective-students"></div>
+            </div>
+
+            <div class="output-tab-panel" id="output-panel-personal" data-output="personal" role="tabpanel" hidden>
+              <div class="output-tab-head">
+                <h3><span class="output-card-icon" aria-hidden="true">📅</span> 학생 개인별 시험시간표</h3>
+                <div class="output-card-actions">
+                  <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="personal">인쇄</button>
+                  <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="personal">전체 PDF</button>
+                </div>
+              </div>
+              <p class="output-desc">학급별 개인별 시험 시간표 게시용 — 해당 반 학생 전원(번호순), 일차·교시별 과목 (이동/고정 구분, B4 가로, 학급 게시용)</p>
+              <div class="output-filters" id="filters-personal"></div>
+            </div>
+
+            <div class="output-tab-panel" id="output-panel-room-assignment" data-output="room-assignment" role="tabpanel" hidden>
+              <div class="output-tab-head">
+                <h3><span class="output-card-icon" aria-hidden="true">🏫</span> 시험실배정현황</h3>
+                <div class="output-card-actions">
+                  <button type="button" class="btn btn-sm btn-primary output-btn-print" data-output="room-assignment">인쇄</button>
+                  <button type="button" class="btn btn-sm btn-secondary output-btn-pdf-all" data-output="room-assignment">전체 PDF</button>
+                </div>
+              </div>
+              <p class="output-desc">학급별 시험실 배정을 출력합니다.</p>
+              <div class="output-filters" id="filters-room-assignment"></div>
+            </div>
+          </div>
+
+          <div class="output-preview-section">
+            <div class="preview-toolbar no-print">
+              <h2 class="card__title"><span class="card-icon" aria-hidden="true">👁️</span> 미리보기</h2>
+              <div class="preview-toolbar-actions">
+                <label>용지
+                  <select id="print-size-select">
+                    <option value="a4-portrait" selected>A4 세로</option>
+                    <option value="a4-landscape">A4 가로</option>
+                    <option value="b4-portrait">B4 세로</option>
+                    <option value="b4-landscape">B4 가로</option>
+                  </select>
+                </label>
+                <button type="button" id="btn-print-output" class="btn btn-primary">인쇄</button>
+              </div>
+            </div>
+            <div id="output-preview" class="output-preview">
+              <p class="placeholder">위 탭에서 출력물을 선택하세요.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="card section-card class-bulk-work-card" id="class-bulk-work-card" data-tour-title="반별 출력물 생성" data-tour-body="출력물과 반을 고르면 zip 한 개에 학년 폴더·반 폴더가 만들어집니다. 학년을 누르면 옆에 반 목록이 뜨고, 전체선택 또는 반별 선택이 가능합니다.">
+        <div class="class-bulk-card-head">
+          <h2 class="card__title"><span class="card-icon" aria-hidden="true">📦</span> 반별 출력물 생성</h2>
+        </div>
+        <p class="output-desc class-bulk-card-desc">출력물과 반을 고르면 <strong>zip 1개</strong>가 만들어집니다. zip 안에는 학년 폴더(<code>2학년</code>)와 반 폴더(<code>2-1</code>)가 있고, 파일명은 <code>1학기 2차 정기시험_응시현황표_2-1</code> 형식입니다.</p>
+        <div class="class-bulk-export">
+          <div class="class-bulk-columns">
+            <section class="class-bulk-column">
+              <h4 class="class-bulk-column-title">출력물 선택</h4>
+              <div class="class-bulk-panel class-bulk-panel--outputs">
+                <label class="class-bulk-check class-bulk-check--all">
+                  <input type="checkbox" id="bulk-select-all-outputs">
+                  <span class="class-bulk-check-label">전체선택</span>
+                </label>
+                <ul class="class-bulk-check-list">
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk="seat-map-board"><span class="class-bulk-check-label">좌석배치도(칠판부착용)</span></label></li>
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk="seat-map-desk"><span class="class-bulk-check-label">좌석배치도(교탁부착용)</span></label></li>
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk="attendance"><span class="class-bulk-check-label">결시현황표 <span class="class-bulk-hint">(일차별)</span></span></label></li>
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk="elective"><span class="class-bulk-check-label">선택과목 응시 학생</span></label></li>
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk="personal"><span class="class-bulk-check-label">개인별 시험 시간표</span></label></li>
+                  <li><label class="class-bulk-check"><input type="checkbox" data-bulk="room-assignment"><span class="class-bulk-check-label">시험실 배정 현황표 <span class="class-bulk-hint">(일차별)</span></span></label></li>
+                </ul>
+              </div>
+            </section>
+            <section class="class-bulk-column">
+              <h4 class="class-bulk-column-title">학년·반 선택</h4>
+              <div class="class-bulk-panel class-bulk-panel--grades">
+                <label class="class-bulk-check class-bulk-check--all">
+                  <input type="checkbox" id="bulk-select-all-grades">
+                  <span class="class-bulk-check-label">전체선택</span>
+                </label>
+                <div id="bulk-grade-class-tree" class="bulk-grade-tree"></div>
+              </div>
+            </section>
+          </div>
+          <button type="button" id="btn-class-bulk-save" class="btn btn-primary class-bulk-save-btn">선택 항목 zip 저장</button>
+          <p class="class-bulk-note">학년을 누르면 옆에 반 목록이 나타납니다. 학년마다 전체선택하거나, 반을 따로 고를 수 있습니다.</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+    <footer class="app-footer no-print">
+      <p class="footer-copyright">
+        <span>© 2026 Exam Flow</span>
+        <span class="footer-copyright__sep" aria-hidden="true"></span>
+        <span>made by 경기 이솔고등학교 교사 이왕혁</span>
+      </p>
+      <p class="footer-meta">Exam Flow v0.9 — 데이터는 이 PC에만 저장됩니다.</p>
+    </footer>
+    </div>
+  </div>
+
+  <div id="bulk-export-stage" class="bulk-export-stage" aria-hidden="true"></div>
+
+  <div id="page-tour" class="page-tour no-print" hidden>
+    <div class="page-tour-scrim" id="page-tour-scrim"></div>
+    <div class="page-tour-pop is-docked" id="page-tour-pop" role="dialog" aria-modal="true" aria-labelledby="page-tour-title" aria-describedby="page-tour-body">
+      <p class="page-tour-progress" id="page-tour-progress">1 / 1</p>
+      <h2 class="page-tour-title" id="page-tour-title"></h2>
+      <p class="page-tour-body" id="page-tour-body"></p>
+      <div class="page-tour-actions">
+        <button type="button" id="page-tour-skip" class="btn btn-ghost btn-sm">건너뛰기</button>
+        <div class="page-tour-nav">
+          <button type="button" id="page-tour-prev" class="btn btn-secondary btn-sm">이전</button>
+          <button type="button" id="page-tour-next" class="btn btn-primary btn-sm">다음</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="js/core.js"></script>
+  <script src="js/students.js"></script>
+  <script src="js/assignment.js"></script>
+  <script src="js/placement.js"></script>
+  <script src="js/outputs.js"></script>
+  <script src="js/app.js"></script>
+  <script src="js/guide.js"></script>
+  <script src="ui-present.js"></script>
+</body>
+</html>
