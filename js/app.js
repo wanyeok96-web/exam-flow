@@ -285,6 +285,7 @@ function ensureStepUI(step) {
 /* ========== Navigation ========== */
 
 const STEP_LABELS = {
+  guide: '가이드',
   '1': '운영설정',
   '2': '학생업로드',
   '3': '시험실배정',
@@ -317,23 +318,29 @@ function openSidebar() {
   if (backdrop) backdrop.hidden = false;
 }
 
+function activateStep(step) {
+  const next = String(step);
+  if (typeof isPageTourActive === 'function' && isPageTourActive() && typeof stopPageTour === 'function') {
+    stopPageTour();
+  }
+  stepTabs().forEach(t => {
+    const on = t.dataset.step === next;
+    t.classList.toggle('active', on);
+    t.setAttribute('aria-selected', on ? 'true' : 'false');
+  });
+  stepPanels().forEach(p => p.classList.remove('active'));
+  const panel = document.getElementById('step-' + next);
+  if (panel) panel.classList.add('active');
+  const mobile = document.getElementById('mobile-current-step');
+  if (mobile) mobile.textContent = STEP_LABELS[next] || '';
+  closeSidebar();
+  if (typeof closeAllBulkClassBubbles === 'function') closeAllBulkClassBubbles();
+  ensureStepUI(next);
+}
+
 function initStepNav() {
   stepTabs().forEach(tab => {
-    tab.addEventListener('click', () => {
-      const step = tab.dataset.step;
-      stepTabs().forEach(t => {
-        const on = t.dataset.step === step;
-        t.classList.toggle('active', on);
-        t.setAttribute('aria-selected', on ? 'true' : 'false');
-      });
-      stepPanels().forEach(p => p.classList.remove('active'));
-      const panel = document.getElementById('step-' + step);
-      if (panel) panel.classList.add('active');
-      const mobile = document.getElementById('mobile-current-step');
-      if (mobile) mobile.textContent = STEP_LABELS[step] || '';
-      closeSidebar();
-      ensureStepUI(step);
-    });
+    tab.addEventListener('click', () => activateStep(tab.dataset.step));
   });
   document.getElementById('btn-sidebar-toggle')?.addEventListener('click', () => {
     if (document.body.classList.contains('sidebar-open')) closeSidebar();
@@ -506,6 +513,7 @@ function init() {
   }
 
   initStepNav();
+  initPageTour();
   initEvents();
   initPlacementEditorEvents();
   applyLockStateToUI();

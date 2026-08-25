@@ -1,0 +1,183 @@
+/* Exam Flow — 가이드·화면별 튜토리얼 */
+
+.sidebar-label--work {
+  margin-top: 18px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.page-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.page-header > div:has(.page-title-row) {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: 100%;
+}
+
+.page-title-row .page-title {
+  min-width: 0;
+}
+
+.btn-page-tour {
+  flex-shrink: 0;
+}
+
+.guide-list {
+  margin: 0 0 4px;
+  padding-left: 1.2em;
+  color: var(--ink);
+  font-size: 14px;
+  line-height: 1.65;
+  max-width: 42rem;
+}
+
+.guide-list li + li { margin-top: 6px; }
+
+.guide-flow {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  counter-reset: guide-step;
+}
+
+.guide-flow li {
+  display: grid;
+  grid-template-columns: 28px 1fr auto;
+  gap: 10px 12px;
+  align-items: start;
+  padding: 14px 0;
+  border-bottom: 1px solid var(--line);
+  counter-increment: guide-step;
+}
+
+.guide-flow li:first-child { padding-top: 2px; }
+
+.guide-flow li:last-child {
+  border-bottom: 0;
+  padding-bottom: 0;
+}
+
+.guide-flow li::before {
+  content: counter(guide-step);
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  background: var(--brand-50);
+  color: var(--brand-700);
+  font-size: 12px;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+
+.guide-flow strong {
+  display: block;
+  font-size: 14px;
+  color: var(--ink);
+}
+
+.guide-flow p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--muted);
+  line-height: 1.55;
+  max-width: 42rem;
+}
+
+.guide-flow .btn { margin-top: 2px; }
+
+.guide-nice-path { margin: 12px 0 0; max-width: none; }
+
+.page-tour[hidden] { display: none !important; }
+
+.page-tour-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.32);
+  z-index: 80;
+}
+
+.page-tour-pop {
+  position: fixed;
+  z-index: 90;
+  width: min(380px, calc(100vw - 24px));
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-card);
+  padding: 16px;
+  box-shadow: 0 12px 40px rgba(15, 23, 42, 0.16);
+}
+
+.page-tour-pop.is-docked {
+  left: 12px;
+  right: 12px;
+  bottom: 12px;
+  top: auto;
+  width: auto;
+}
+
+.page-tour-progress {
+  margin: 0 0 6px;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+
+.page-tour-title {
+  margin: 0 0 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--ink);
+}
+
+.page-tour-body {
+  margin: 0 0 14px;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+.page-tour-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.page-tour-nav { display: flex; gap: 6px; }
+
+body.page-tour-active .section-card.tour-card-spotlight {
+  position: relative;
+  z-index: 85;
+  overflow: visible;
+  box-shadow: 0 0 0 3px #fff, 0 0 0 5px var(--brand-600);
+  pointer-events: none;
+}
+
+body.operation-locked #step-guide {
+  opacity: 1;
+  pointer-events: auto;
+  filter: none;
+}
+
+body.operation-locked .btn-page-tour {
+  pointer-events: auto;
+  opacity: 1;
+  filter: none;
+}
+
+@media (max-width: 720px) {
+  .guide-flow li { grid-template-columns: 28px 1fr; }
+  .guide-flow .btn { grid-column: 2; justify-self: start; }
+}

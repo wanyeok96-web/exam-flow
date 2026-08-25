@@ -103,7 +103,10 @@ const MOVE_MODE_OPTIONS = [
 ];
 
 function syncMovementModePanels(root = document) {
-  root.querySelectorAll('.movement-grade-block').forEach(block => {
+  const blocks = root.matches?.('.movement-grade-block')
+    ? [root]
+    : [...root.querySelectorAll('.movement-grade-block')];
+  blocks.forEach(block => {
     const enabled = block.querySelector('.movement-enabled')?.checked;
     block.classList.toggle('is-enabled', !!enabled);
     const mode = block.querySelector('.movement-mode:checked')?.value || 'from-front';

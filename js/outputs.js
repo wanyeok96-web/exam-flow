@@ -1279,6 +1279,7 @@ function refreshOutputFilters() {
   renderFilterGroup('filters-elective-students', ['room', 'bulkPrint']);
   renderFilterGroup('filters-personal', ['grade', 'class', 'bulkPrint']);
   renderFilterGroup('filters-room-assignment', ['grade', 'day', 'class', 'bulkPrint']);
+  renderBulkGradeClassTree();
 }
 
 function renderFilterGroup(containerId, fields) {
@@ -1770,16 +1771,37 @@ function getBulkExportSelections() {
     elective: !!panel.querySelector('[data-bulk="elective"]')?.checked,
     personal: !!panel.querySelector('[data-bulk="personal"]')?.checked,
     roomAssignment: !!panel.querySelector('[data-bulk="room-assignment"]')?.checked,
-    grades: [1, 2, 3].filter(g => panel.querySelector(`[data-bulk-grade="${g}"]`)?.checked)
+    classes: [...panel.querySelectorAll('[data-bulk-class]:checked')].map(cb => ({
+      grade: parseInt(cb.dataset.grade, 10),
+      classNo: parseInt(cb.dataset.class, 10)
+    }))
   };
 }
 
-function getBulkGradeZipName(grade) {
-  return sanitizeDownloadFilename(`${grade}학년.zip`);
+function getBulkExamNamePrefix() {
+  if (typeof collectMetaFromDOM === 'function') collectMetaFromDOM();
+  const m = appState.examMeta;
+  const examName = (m.examName || '정기시험').trim();
+  return `${m.semester}학기 ${m.round}차 ${examName}`.replace(/\s+/g, ' ').trim();
+}
+
+function getBulkBundleZipName() {
+  return sanitizeDownloadFilename(`${getBulkExamNamePrefix()}_반별출력물.zip`);
+}
+
+function getBulkGradeFolderName(grade) {
+  return sanitizeDownloadFilename(`${grade}학년`);
 }
 
 function getBulkClassFolderName(grade, classNo) {
   return sanitizeDownloadFilename(`${grade}-${classNo}`);
+}
+
+function getBulkClassFileName(outputLabel, grade, classNo, day) {
+  const prefix = getBulkExamNamePrefix();
+  const className = `${grade}-${classNo}`;
+  const output = Number.isFinite(day) ? `${outputLabel}(${day}일차)` : outputLabel;
+  return sanitizeDownloadFilename(`${prefix}_${output}_${className}.pdf`);
 }
 
 function getClassHomeroomRoom(grade, classNo) {
@@ -1816,7 +1838,7 @@ function buildClassBulkFiles(selections, grade, classNo) {
     const html = renderPersonalBoardPage(grade, classNo);
     if (outputHtmlHasDocuments(html)) {
       files.push({
-        name: sanitizeDownloadFilename('개인별 시험 시간표.pdf'),
+        name: getBulkClassFileName('개인별 시험 시간표', grade, classNo),
         html: `<div class="personal-board-batch">${html}</div>`,
         printSize: BULK_EXPORT_PRINT_SIZE.personal
       });
@@ -1828,7 +1850,7 @@ function buildClassBulkFiles(selections, grade, classNo) {
       const html = renderClassAssignmentPage(day, grade, classNo);
       if (outputHtmlHasDocuments(html)) {
         files.push({
-          name: sanitizeDownloadFilename(`시험실배정현황(${day}일차).pdf`),
+          name: getBulkClassFileName('시험실배정현황', grade, classNo, day),
           html,
           printSize: BULK_EXPORT_PRINT_SIZE['room-assignment']
         });
@@ -1842,7 +1864,7 @@ function buildClassBulkFiles(selections, grade, classNo) {
     const html = renderSeatMapPage(getSeatMapFiltersForRoom(examRoom, 'board', grade));
     if (outputHtmlHasDocuments(html)) {
       files.push({
-        name: sanitizeDownloadFilename('좌석배치도(칠판부착용).pdf'),
+        name: getBulkClassFileName('좌석배치도(칠판부착용)', grade, classNo),
         html,
         printSize: BULK_EXPORT_PRINT_SIZE['seat-map-board']
       });
@@ -1853,7 +1875,7 @@ function buildClassBulkFiles(selections, grade, classNo) {
     const html = renderSeatMapPage(getSeatMapFiltersForRoom(examRoom, 'desk', grade));
     if (outputHtmlHasDocuments(html)) {
       files.push({
-        name: sanitizeDownloadFilename('좌석배치도(교탁부착용).pdf'),
+        name: getBulkClassFileName('좌석배치도(교탁부착용)', grade, classNo),
         html,
         printSize: BULK_EXPORT_PRINT_SIZE['seat-map-desk']
       });
@@ -1865,7 +1887,7 @@ function buildClassBulkFiles(selections, grade, classNo) {
       const html = renderAttendanceRoomDaySheet(examRoom, day);
       if (outputHtmlHasDocuments(html)) {
         files.push({
-          name: sanitizeDownloadFilename(`결시현황표(${day}일차).pdf`),
+          name: getBulkClassFileName('응시현황표', grade, classNo, day),
           html,
           printSize: BULK_EXPORT_PRINT_SIZE.attendance
         });
@@ -1877,7 +1899,7 @@ function buildClassBulkFiles(selections, grade, classNo) {
     const html = renderElectiveStudentsPage(examRoom);
     if (outputHtmlHasDocuments(html)) {
       files.push({
-        name: sanitizeDownloadFilename('선택과목 응시 학생.pdf'),
+        name: getBulkClassFileName('선택과목 응시 학생', grade, classNo),
         html: `<div class="elective-students-batch">${html}</div>`,
         printSize: BULK_EXPORT_PRINT_SIZE.elective
       });
@@ -1887,22 +1909,25 @@ function buildClassBulkFiles(selections, grade, classNo) {
   return files;
 }
 
-function buildBulkZipPlans(selections, grades) {
-  return grades.map(grade => {
-    const classFolders = getOrderedClassNosForGrade(grade)
-      .map(classNo => {
-        const files = buildClassBulkFiles(selections, grade, classNo);
-        if (!files.length) return null;
-        return {
-          folderName: getBulkClassFolderName(grade, classNo),
-          files
-        };
-      })
-      .filter(Boolean);
+function buildBulkZipPlans(selections) {
+  const byGrade = new Map();
+  selections.classes.forEach(({ grade, classNo }) => {
+    const files = buildClassBulkFiles(selections, grade, classNo);
+    if (!files.length) return;
+    if (!byGrade.has(grade)) byGrade.set(grade, []);
+    byGrade.get(grade).push({
+      folderName: getBulkClassFolderName(grade, classNo),
+      files
+    });
+  });
 
-    if (!classFolders.length) return null;
-    return { zipName: getBulkGradeZipName(grade), classFolders };
-  }).filter(Boolean);
+  return [...byGrade.entries()]
+    .sort((a, b) => a[0] - b[0])
+    .map(([grade, classFolders]) => ({
+      gradeFolder: getBulkGradeFolderName(grade),
+      classFolders
+    }))
+    .filter(plan => plan.classFolders.length);
 }
 
 function waitAnimationFrames(count = 2) {
@@ -2035,8 +2060,8 @@ async function runClassBulkExport() {
   }
 
   const sel = getBulkExportSelections();
-  if (!sel.grades.length) {
-    alert('학년을 하나 이상 선택하세요.');
+  if (!sel.classes.length) {
+    alert('반을 하나 이상 선택하세요. 학년 버튼을 누르면 반 목록이 열립니다.');
     return;
   }
 
@@ -2048,7 +2073,7 @@ async function runClassBulkExport() {
   }
   if (!confirmPrintWarnings()) return;
 
-  const allPlans = buildBulkZipPlans(sel, sel.grades);
+  const allPlans = buildBulkZipPlans(sel);
 
   if (!allPlans.length) {
     alert('선택한 조건에 해당하는 출력 데이터가 없습니다.');
@@ -2076,28 +2101,25 @@ async function runClassBulkExport() {
   if (btn) btn.disabled = true;
 
   let done = 0;
-  let savedCount = 0;
   try {
+    const zip = new JSZip();
     for (const plan of allPlans) {
-      const zip = new JSZip();
       for (const classFolder of plan.classFolders) {
         for (const file of classFolder.files) {
           done += 1;
           if (btn) btn.textContent = `생성 중… (${done}/${totalPdfs})`;
           const blob = await renderHtmlToPdfBlob(file.html, file.printSize, stageEl);
-          if (blob) zip.file(`${classFolder.folderName}/${file.name}`, blob);
+          if (blob) zip.file(`${plan.gradeFolder}/${classFolder.folderName}/${file.name}`, blob);
         }
       }
-      if (!Object.keys(zip.files).length) continue;
-      const zipBlob = await zip.generateAsync({ type: 'blob' });
-      await downloadBlobFile(zipBlob, plan.zipName);
-      savedCount += 1;
     }
-    if (!savedCount) {
+    if (!Object.keys(zip.files).length) {
       alert('PDF 생성에 실패했습니다.\n출력 데이터가 없거나 브라우저에서 PDF 변환을 차단했을 수 있습니다.');
       return;
     }
-    alert(`${savedCount}개 zip 파일 저장을 시작했습니다.\n브라우저 다운로드 폴더를 확인하세요.`);
+    const zipBlob = await zip.generateAsync({ type: 'blob' });
+    await downloadBlobFile(zipBlob, getBulkBundleZipName());
+    alert('zip 파일 저장을 시작했습니다.\n브라우저 다운로드 폴더를 확인하세요.');
   } catch (e) {
     alert('일괄 저장 실패: ' + e.message);
   } finally {
@@ -2129,14 +2151,172 @@ function scheduleRefreshOutputPreview() {
 
 let step5OutputInitialized = false;
 
-function initClassBulkExportUI() {
+function closeAllBulkClassBubbles() {
+  $$('.bulk-grade-item.is-open').forEach(item => setBulkGradeOpen(item, false));
+}
+
+function layoutBulkClassBubble(item) {
+  const bubble = item?.querySelector('.bulk-grade-classes');
+  const toggle = item?.querySelector('.bulk-grade-toggle');
+  if (!bubble || !toggle || bubble.hidden) return;
+
+  const rect = toggle.getBoundingClientRect();
+  const bubbleW = bubble.offsetWidth || 240;
+  const bubbleH = bubble.offsetHeight || 160;
+  const gap = 12;
+  let left = rect.left - bubbleW - gap;
+  let placeRight = left < 12;
+  if (placeRight) {
+    left = Math.min(rect.right + gap, window.innerWidth - bubbleW - 12);
+    left = Math.max(12, left);
+  }
+  let top = rect.top + rect.height / 2 - Math.min(28, bubbleH / 2);
+  top = Math.max(12, Math.min(top, window.innerHeight - bubbleH - 12));
+  bubble.classList.toggle('is-right', placeRight);
+  bubble.style.left = `${left}px`;
+  bubble.style.top = `${top}px`;
+  bubble.style.setProperty('--arrow-top', `${rect.top + rect.height / 2 - top}px`);
+}
+
+function setBulkGradeOpen(item, open) {
+  if (!item) return;
+  if (open) {
+    $$('.bulk-grade-item.is-open').forEach(el => {
+      if (el !== item) setBulkGradeOpen(el, false);
+    });
+  }
+  item.classList.toggle('is-open', open);
+  const box = item.querySelector('.bulk-grade-classes');
+  const toggle = item.querySelector('.bulk-grade-toggle');
+  if (toggle) toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+  if (!box) return;
+  if (open) {
+    box.hidden = false;
+    layoutBulkClassBubble(item);
+    requestAnimationFrame(() => layoutBulkClassBubble(item));
+  } else {
+    box.hidden = true;
+    box.classList.remove('is-right');
+    box.style.left = '';
+    box.style.top = '';
+  }
+}
+
+function updateBulkGradeMeta(grade) {
   const panel = $('#class-bulk-work-card');
   if (!panel) return;
+  const classes = [...panel.querySelectorAll(`[data-bulk-class][data-grade="${grade}"]`)];
+  const checked = classes.filter(cb => cb.checked).length;
+  const meta = panel.querySelector(`[data-grade-meta="${grade}"]`);
+  if (!meta) return;
+  meta.textContent = checked
+    ? `${checked}/${classes.length}개 반 선택`
+    : `${classes.length}개 반`;
+}
+
+function syncBulkGradeChecks(grade) {
+  const panel = $('#class-bulk-work-card');
+  if (!panel) return;
+  const classes = [...panel.querySelectorAll(`[data-bulk-class][data-grade="${grade}"]`)];
+  const checked = classes.filter(cb => cb.checked).length;
+  const allOn = classes.length > 0 && checked === classes.length;
+  const some = checked > 0 && checked < classes.length;
+  const gradeCb = panel.querySelector(`[data-bulk-grade="${grade}"]`);
+  const allCb = panel.querySelector(`[data-bulk-class-all="${grade}"]`);
+  if (gradeCb) {
+    gradeCb.checked = allOn;
+    gradeCb.indeterminate = some;
+  }
+  if (allCb) {
+    allCb.checked = allOn;
+    allCb.indeterminate = some;
+  }
+  updateBulkGradeMeta(grade);
+}
+
+function syncBulkSelectAllClasses() {
+  const panel = $('#class-bulk-work-card');
+  const master = panel?.querySelector('#bulk-select-all-grades');
+  if (!panel || !master) return;
+  const classes = [...panel.querySelectorAll('[data-bulk-class]')];
+  const checked = classes.filter(cb => cb.checked).length;
+  master.checked = classes.length > 0 && checked === classes.length;
+  master.indeterminate = checked > 0 && checked < classes.length;
+}
+
+function setBulkClassesChecked(grade, checked) {
+  const panel = $('#class-bulk-work-card');
+  if (!panel) return;
+  panel.querySelectorAll(`[data-bulk-class][data-grade="${grade}"]`).forEach(cb => {
+    cb.checked = checked;
+  });
+  syncBulkGradeChecks(grade);
+}
+
+function renderBulkGradeClassTree() {
+  const tree = $('#bulk-grade-class-tree');
+  const panel = $('#class-bulk-work-card');
+  if (!tree || !panel) return;
+
+  const prevSelected = new Set(
+    [...panel.querySelectorAll('[data-bulk-class]:checked')].map(cb => cb.value)
+  );
+  const prevOpen = new Set(
+    [...tree.querySelectorAll('.bulk-grade-item.is-open')].map(el => el.dataset.grade)
+  );
+  closeAllBulkClassBubbles();
+
+  tree.innerHTML = [1, 2, 3].map(g => {
+    const classNos = getOrderedClassNosForGrade(g);
+    const classItems = classNos.map(c => `
+      <label class="class-bulk-check bulk-class-check">
+        <input type="checkbox" data-bulk-class="${g}-${c}" data-grade="${g}" data-class="${c}" value="${g}-${c}">
+        <span class="class-bulk-check-label">${g}-${c}</span>
+      </label>`).join('');
+    const empty = classNos.length
+      ? ''
+      : '<p class="bulk-grade-empty">반 목록이 없습니다. 고사실을 만들거나 학생을 업로드하세요.</p>';
+    return `
+      <div class="bulk-grade-item" data-grade="${g}">
+        <div class="bulk-grade-row">
+          <button type="button" class="bulk-grade-toggle" data-grade="${g}" aria-expanded="false" aria-haspopup="dialog">
+            <span class="bulk-grade-caret" aria-hidden="true">▸</span>
+            <span class="bulk-grade-name">${g}학년</span>
+            <span class="bulk-grade-meta" data-grade-meta="${g}">${classNos.length}개 반</span>
+          </button>
+          <label class="bulk-grade-pick" title="${g}학년 전체 선택">
+            <input type="checkbox" data-bulk-grade="${g}">
+            <span class="visually-hidden">${g}학년 전체 선택</span>
+          </label>
+        </div>
+        <div class="bulk-grade-classes" data-grade="${g}" hidden role="dialog" aria-label="${g}학년 반 선택">
+          <label class="class-bulk-check class-bulk-check--all bulk-class-all">
+            <input type="checkbox" data-bulk-class-all="${g}">
+            <span class="class-bulk-check-label">전체선택</span>
+          </label>
+          <div class="bulk-class-grid">${classItems || empty}</div>
+        </div>
+      </div>`;
+  }).join('');
+
+  prevSelected.forEach(value => {
+    const cb = tree.querySelector(`[data-bulk-class][value="${value}"]`);
+    if (cb) cb.checked = true;
+  });
+  prevOpen.forEach(grade => {
+    setBulkGradeOpen(tree.querySelector(`.bulk-grade-item[data-grade="${grade}"]`), true);
+  });
+  [1, 2, 3].forEach(g => syncBulkGradeChecks(g));
+  syncBulkSelectAllClasses();
+}
+
+function initClassBulkExportUI() {
+  const panel = $('#class-bulk-work-card');
+  if (!panel || panel.dataset.bulkUiReady === '1') return;
+  panel.dataset.bulkUiReady = '1';
 
   const allOutputs = panel.querySelector('#bulk-select-all-outputs');
   const outputChecks = [...panel.querySelectorAll('[data-bulk]')];
-  const allGrades = panel.querySelector('#bulk-select-all-grades');
-  const gradeChecks = [...panel.querySelectorAll('[data-bulk-grade]')];
 
   const syncSelectAll = (master, items) => {
     if (!master || !items.length) return;
@@ -2153,13 +2333,63 @@ function initClassBulkExportUI() {
     cb.addEventListener('change', () => syncSelectAll(allOutputs, outputChecks));
   });
 
-  allGrades?.addEventListener('change', () => {
-    gradeChecks.forEach(cb => { cb.checked = allGrades.checked; });
-    allGrades.indeterminate = false;
+  panel.addEventListener('click', e => {
+    const toggle = e.target.closest('.bulk-grade-toggle');
+    if (!toggle || !panel.contains(toggle)) return;
+    e.stopPropagation();
+    const item = toggle.closest('.bulk-grade-item');
+    setBulkGradeOpen(item, !item.classList.contains('is-open'));
   });
-  gradeChecks.forEach(cb => {
-    cb.addEventListener('change', () => syncSelectAll(allGrades, gradeChecks));
+
+  document.addEventListener('click', e => {
+    if (!document.querySelector('.bulk-grade-item.is-open')) return;
+    if (e.target.closest('.bulk-grade-item.is-open')) return;
+    if (e.target.closest('.bulk-grade-classes:not([hidden])')) return;
+    closeAllBulkClassBubbles();
   });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape') closeAllBulkClassBubbles();
+  });
+  window.addEventListener('resize', () => {
+    const open = document.querySelector('.bulk-grade-item.is-open');
+    if (open) layoutBulkClassBubble(open);
+  });
+  window.addEventListener('scroll', () => {
+    const open = document.querySelector('.bulk-grade-item.is-open');
+    if (open) layoutBulkClassBubble(open);
+  }, true);
+
+  panel.addEventListener('change', e => {
+    const t = e.target;
+    if (t.id === 'bulk-select-all-grades') {
+      panel.querySelectorAll('[data-bulk-class]').forEach(cb => { cb.checked = t.checked; });
+      panel.querySelectorAll('[data-bulk-grade], [data-bulk-class-all]').forEach(cb => {
+        cb.checked = t.checked;
+        cb.indeterminate = false;
+      });
+      t.indeterminate = false;
+      [1, 2, 3].forEach(g => updateBulkGradeMeta(g));
+      return;
+    }
+    if (t.matches('[data-bulk-grade]')) {
+      const g = t.dataset.bulkGrade;
+      setBulkClassesChecked(g, t.checked);
+      syncBulkSelectAllClasses();
+      return;
+    }
+    if (t.matches('[data-bulk-class-all]')) {
+      const g = t.dataset.bulkClassAll;
+      setBulkClassesChecked(g, t.checked);
+      syncBulkSelectAllClasses();
+      return;
+    }
+    if (t.matches('[data-bulk-class]')) {
+      syncBulkGradeChecks(t.dataset.grade);
+      syncBulkSelectAllClasses();
+    }
+  });
+
+  renderBulkGradeClassTree();
 }
 
 function initStep5Output() {
