@@ -59,11 +59,118 @@ function formatTimetableDayHeader(day) {
   return `${dt.getMonth() + 1}/${dt.getDate()}(${weekdays[dt.getDay()]})`;
 }
 
+function renderOpsSetupOverview() {
+  const live = $('#ops-setup-live-summary');
+  if (live) live.textContent = describeOpsSetupLiveSummary();
+}
+
+function renderGradeParticipation() {
+  const container = $('#grade-participation-container');
+  const summary = $('#grade-participation-summary');
+  if (!container) return;
+
+  ensureGradeParticipationState();
+  container.innerHTML = ALL_GRADES.map(g => {
+    const mode = getGradeParticipation(g);
+    const options = GRADE_PARTICIPATION_MODES.map(m => `
+      <label class="grade-participation-option${mode === m ? ' is-selected' : ''}">
+        <input type="radio" class="grade-participation-mode" name="grade-participation-${g}" data-grade="${g}" value="${m}" ${mode === m ? 'checked' : ''}>
+        <span class="grade-participation-option-text">
+          <span class="grade-participation-option-label">${GRADE_PARTICIPATION_LABELS[m]}</span>
+          <span class="grade-participation-option-hint">${GRADE_PARTICIPATION_HINTS[m]}</span>
+        </span>
+      </label>`).join('');
+    return `
+      <div class="grade-participation-block" data-grade="${g}" data-mode="${mode}">
+        <h3 class="grade-participation-title">${g}학년</h3>
+        <div class="grade-participation-options" role="radiogroup" aria-label="${g}학년 참여">${options}</div>
+      </div>`;
+  }).join('');
+
+  if (summary) summary.textContent = `이번 고사: ${describeGradeParticipationSummary()}`;
+  renderOpsSetupOverview();
+}
+
+function renderMovementOverviewSummary() {
+  const el = $('#movement-overview-summary');
+  if (!el) return;
+  const examGrades = getExamGrades();
+  if (!examGrades.length) {
+    el.innerHTML = '<p class="hint">응시 학년이 없어 이동·잔류 요약이 없습니다.</p>';
+    return;
+  }
+
+  const chips = examGrades.map(g => {
+    const rule = getMoveRules(g);
+    if (rule.enabled && rule.targetGrade) {
+      return `<span class="move-overview-chip is-move">${g}학년 → ${rule.targetGrade}학년 교실 · ${describeMoveRule(rule)}</span>`;
+    }
+    return `<span class="move-overview-chip is-stay">${g}학년 · 본반 잔류</span>`;
+  });
+
+  ALL_GRADES.filter(g => getGradeParticipation(g) === 'host').forEach(g => {
+    chips.push(`<span class="move-overview-chip is-host">${g}학년 · 교실만 제공</span>`);
+  });
+  ALL_GRADES.filter(g => getGradeParticipation(g) === 'off').forEach(g => {
+    chips.push(`<span class="move-overview-chip is-off">${g}학년 · 미참여</span>`);
+  });
+
+  el.innerHTML = `<div class="move-overview-chips">${chips.join('')}</div>`;
+  renderOpsSetupOverview();
+}
+
+function collectGradeParticipationFromDOM() {
+  if (!document.querySelector('.grade-participation-mode')) return;
+  ensureGradeParticipationState();
+  ALL_GRADES.forEach(g => {
+    const checked = document.querySelector(`.grade-participation-mode[data-grade="${g}"]:checked`);
+    if (checked) {
+      appState.examRules.gradeParticipation[g] = normalizeGradeParticipationMode(checked.value);
+    }
+  });
+}
+
+function applyGradeParticipationChange() {
+  if (guardIfLocked('학년 참여 설정 수정')) {
+    renderGradeParticipation();
+    return;
+  }
+  collectGradeParticipationFromDOM();
+  sanitizeMovementRulesForParticipation();
+  pruneNonExamOperationalData();
+  rebuildMoveTargetCache();
+  if (hasFixedRoomSeats() || appState.examGroups.length) {
+    rebuildSeatAssignmentsFromFixed();
+    if (appState.examGroups.length) syncDerivedRoomAssignments();
+  }
+  renderUnifiedTimetable();
+  renderMovementRules();
+  renderMovementOverviewSummary();
+  renderMovementPreviewSelect();
+  renderRoomsGradeSetup();
+  renderGradeParticipation();
+  renderOpsSetupOverview();
+  refreshOutputFilters();
+  invalidateSteps('3', '4', '5');
+  invalidateDiagnosis();
+  if (hasFixedRoomSeats() || appState.examGroups.length) {
+    tryAutoAssignFixedSeats();
+  }
+  syncStateToWindow();
+  persistAllSettings();
+}
+
 function renderUnifiedTimetable() {
   const container = $('#timetable-container');
   if (!container) return;
   const days = appState.examMeta.days;
   const periods = appState.examMeta.periodsPerDay;
+  const examGrades = getExamGrades();
+
+  if (!examGrades.length) {
+    container.innerHTML = '<p class="hint">응시 학년이 없습니다. 위에서 학년별 참여를 「응시」로 설정하세요.</p>';
+    return;
+  }
 
   let html = '<div class="timetable-scroll"><table class="timetable-table timetable-unified"><thead><tr>';
   html += '<th class="tt-col-grade">학년</th><th class="tt-col-period">교시</th>';
@@ -72,7 +179,7 @@ function renderUnifiedTimetable() {
   }
   html += '</tr></thead><tbody>';
 
-  [1, 2, 3].forEach(grade => {
+  examGrades.forEach(grade => {
     if (!appState.timetable[grade]) appState.timetable[grade] = {};
     for (let p = 1; p <= periods; p++) {
       const gradeSep = p === periods ? ' class="tt-grade-separator"' : '';
@@ -92,6 +199,10 @@ function renderUnifiedTimetable() {
   });
 
   html += '</tbody></table></div>';
+  const skipped = ALL_GRADES.filter(g => !isGradeTakingExam(g));
+  if (skipped.length) {
+    html += `<p class="hint">${skipped.map(g => `${g}학년`).join('·')}은 미응시(또는 교실만 제공)라 시간표에서 제외되었습니다.</p>`;
+  }
   container.innerHTML = html;
 }
 
@@ -109,6 +220,15 @@ function syncMovementModePanels(root = document) {
   blocks.forEach(block => {
     const enabled = block.querySelector('.movement-enabled')?.checked;
     block.classList.toggle('is-enabled', !!enabled);
+    const g = block.dataset.grade;
+    const title = block.querySelector('.movement-grade-head h3');
+    if (title && g) title.textContent = `${g}학년 · ${enabled ? '이동' : '본반 잔류'}`;
+    const stayHint = block.querySelector('.movement-stay-hint');
+    if (stayHint) {
+      stayHint.textContent = enabled
+        ? '아래에서 이동 교실과 대상을 정하세요.'
+        : '체크하지 않으면 본인 학급 교실에서 응시합니다.';
+    }
     const mode = block.querySelector('.movement-mode:checked')?.value || 'from-front';
     block.querySelectorAll('.movement-mode-panel').forEach(panel => {
       panel.hidden = panel.dataset.panel !== mode;
@@ -118,7 +238,17 @@ function syncMovementModePanels(root = document) {
 
 function renderMovementRules() {
   const container = $('#movement-rules-container');
-  container.innerHTML = [1, 2, 3].map(g => {
+  if (!container) return;
+
+  const examGrades = getExamGrades();
+  if (!examGrades.length) {
+    container.innerHTML = '<p class="hint">응시 학년이 없어 이동·잔류 설정을 표시하지 않습니다.</p>';
+    renderMovementOverviewSummary();
+    return;
+  }
+
+  const hostTargets = getHostingGrades();
+  container.innerHTML = examGrades.map(g => {
     const rule = getMoveRules(g);
     const mode = rule.mode || 'from-front';
     const count = rule.count || 14;
@@ -127,21 +257,25 @@ function renderMovementRules() {
         <input type="radio" class="movement-mode" name="movement-mode-${g}" data-grade="${g}" value="${m.id}" ${mode === m.id ? 'checked' : ''}>
         ${m.label}
       </label>`).join('');
+    const targetOpts = hostTargets.filter(t => t !== g).map(t =>
+      `<option value="${t}" ${rule.targetGrade === t ? 'selected' : ''}>${t}학년 교실</option>`
+    ).join('');
     return `
       <div class="movement-grade-block${rule.enabled ? ' is-enabled' : ''}" data-grade="${g}">
         <div class="movement-grade-head">
-          <h3>${g}학년 이동 설정</h3>
+          <h3>${g}학년 · ${rule.enabled ? '이동' : '본반 잔류'}</h3>
           <label class="movement-enable-inline">
             <input type="checkbox" class="movement-enabled" data-grade="${g}" ${rule.enabled ? 'checked' : ''}>
             다른 학년 교실로 이동
           </label>
+          <p class="hint movement-stay-hint">${rule.enabled ? '아래에서 이동 교실과 대상을 정하세요.' : '체크하지 않으면 본인 학급 교실에서 응시합니다.'}</p>
         </div>
         <div class="movement-grade-body">
           <div class="form-inline-row movement-fields-row">
             <label>이동할 교실
               <select class="movement-target" data-grade="${g}">
                 <option value="">없음</option>
-                ${[1, 2, 3].filter(t => t !== g).map(t => `<option value="${t}" ${rule.targetGrade === t ? 'selected' : ''}>${t}학년 교실</option>`).join('')}
+                ${targetOpts}
               </select>
             </label>
           </div>
@@ -174,7 +308,14 @@ function renderMovementRules() {
         </div>
       </div>`;
   }).join('');
+
+  const skipped = ALL_GRADES.filter(g => !isGradeTakingExam(g));
+  if (skipped.length) {
+    container.insertAdjacentHTML('beforeend',
+      `<p class="hint" style="grid-column:1/-1">${skipped.map(g => `${g}학년`).join('·')}은 미응시라 이동·잔류 설정에서 제외되었습니다.</p>`);
+  }
   syncMovementModePanels();
+  renderMovementOverviewSummary();
   renderMovementPreviewSelect();
 }
 
@@ -184,7 +325,7 @@ function renderMovementPreviewSelect() {
   const prev = sel.value;
   const options = ['<option value="">학년·반 선택</option>'];
 
-  [1, 2, 3].forEach(g => {
+  getExamGrades().forEach(g => {
     const rule = getMoveRules(g);
     if (!rule.enabled) return;
     const classNos = sortClassNos(
@@ -210,14 +351,23 @@ function renderRoomsGradeSetup() {
   const container = $('#rooms-setup-grid');
   if (!container) return;
 
-  const gradeCols = [1, 2, 3].map(g => `
-    <div class="room-setup-col">
+  const gradeCols = ALL_GRADES.map(g => {
+    const mode = getGradeParticipation(g);
+    const hosting = isGradeHostingRooms(g);
+    const note = mode === 'off'
+      ? '<p class="hint room-setup-note">미참여 — 교실 생성 불필요</p>'
+      : mode === 'host'
+        ? '<p class="hint room-setup-note">교실만 제공 (해당 학년 미응시)</p>'
+        : '';
+    return `
+    <div class="room-setup-col${hosting ? '' : ' is-inactive'}" data-grade="${g}">
       <h4 class="room-setup-col-title">${g}학년</h4>
-      <label class="room-setup-field"><span>학급 수</span><input type="number" id="class-count-${g}" value="${getClassCountForGrade(g)}" min="0" max="30"></label>
-      <label class="room-setup-field"><span>학급당 좌석 수</span><input type="number" id="class-capacity-${g}" value="30" min="1"></label>
-      <button type="button" class="btn btn-secondary room-setup-btn btn-generate-classes" data-grade="${g}">교실 생성</button>
-    </div>
-  `).join('');
+      ${note}
+      <label class="room-setup-field"><span>학급 수</span><input type="number" id="class-count-${g}" value="${getClassCountForGrade(g)}" min="0" max="30" ${hosting ? '' : 'disabled'}></label>
+      <label class="room-setup-field"><span>학급당 좌석 수</span><input type="number" id="class-capacity-${g}" value="30" min="1" ${hosting ? '' : 'disabled'}></label>
+      <button type="button" class="btn btn-secondary room-setup-btn btn-generate-classes" data-grade="${g}" ${hosting ? '' : 'disabled'}>교실 생성</button>
+    </div>`;
+  }).join('');
 
   container.innerHTML = `
     ${gradeCols}
@@ -317,8 +467,8 @@ function collectTimetableFromDOM() {
 }
 
 function collectMovementRulesFromDOM() {
-  if (!document.querySelector('.movement-enabled')) return;
-  [1, 2, 3].forEach(g => {
+  if (!document.querySelector('.movement-enabled') && !document.querySelector('.grade-participation-mode')) return;
+  ALL_GRADES.forEach(g => {
     const block = document.querySelector(`.movement-grade-block[data-grade="${g}"]`);
     if (!block) return;
     const enabled = block.querySelector('.movement-enabled')?.checked;
@@ -347,7 +497,7 @@ function collectMovementRulesFromDOM() {
       count = Math.max(1, toNumber - fromNumber + 1);
     }
     appState.examRules.movementRules[g] = {
-      enabled: !!enabled,
+      enabled: !!enabled && isGradeTakingExam(g),
       targetGrade: target ? parseInt(target, 10) : null,
       mode,
       count,
@@ -357,6 +507,7 @@ function collectMovementRulesFromDOM() {
       rangeEnd: toNumber
     };
   });
+  sanitizeMovementRulesForParticipation();
   rebuildMoveTargetCache();
 }
 
@@ -382,6 +533,7 @@ function saveTimetable() {
 function saveMovementRules() {
   if (guardIfLocked('이동반 규칙 수정')) return;
   collectMovementRulesFromDOM();
+  renderMovementOverviewSummary();
   renderMovementPreview();
   syncStateToWindow();
   persistAllSettings();
@@ -396,6 +548,10 @@ function saveSeatDefaults() {
 }
 
 function generateClassRooms(grade) {
+  if (!isGradeHostingRooms(grade)) {
+    alert(`${grade}학년은 미참여라 교실을 생성하지 않습니다.\n운영설정의 학년별 참여에서 「응시」 또는 「교실만 제공」으로 바꾼 뒤 다시 시도하세요.`);
+    return;
+  }
   const count = parseInt($(`#class-count-${grade}`).value, 10);
   const capacity = parseInt($(`#class-capacity-${grade}`).value, 10) || 30;
   appState.rooms = appState.rooms.filter(r => !(r.type === 'class' && r.grade === grade));
@@ -613,7 +769,11 @@ async function handleGradeUpload(grade, file) {
     mergeStudentsFromRows(rows, grade);
     const count = Object.values(appState.students).filter(s => s.grade === grade).length;
     const excludeNote = excludedCount ? ` · (미재학) ${excludedCount}명 제외` : '';
-    statusEl.textContent = `완료 (${count}명${excludeNote})`;
+    const partMode = getGradeParticipation(grade);
+    const partNote = partMode === 'exam'
+      ? ''
+      : ` · ${GRADE_PARTICIPATION_LABELS[partMode]}(일정·좌석 제외)`;
+    statusEl.textContent = `완료 (${count}명${excludeNote}${partNote})`;
     statusEl.classList.add('done');
     statusEl.closest('.upload-box')?.classList.add('is-done');
     showEl(errorEl, false);

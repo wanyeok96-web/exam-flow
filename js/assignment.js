@@ -16,6 +16,7 @@ function generateSchedulesAndGroups() {
   const groupsMap = {};
 
   Object.values(appState.students).forEach(st => {
+    if (!isGradeTakingExam(st.grade)) return;
     const gradeTimetable = appState.timetable[st.grade];
     if (!gradeTimetable) return;
 
@@ -214,7 +215,7 @@ function runValidation() {
   students.forEach(s => s.subjects.forEach(sub => allSubjects.add(sub)));
 
   const missingSubjects = [];
-  [1, 2, 3].forEach(g => {
+  getExamGrades().forEach(g => {
     const tt = appState.timetable[g] || {};
     Object.values(tt).forEach(periods => {
       Object.values(periods).forEach(subjects => {
@@ -231,14 +232,23 @@ function runValidation() {
     results.push({ level: 'ok', msg: '시간표 과목이 학생 데이터와 일치합니다.' });
   }
 
-  const noSchedule = students.filter(s => {
+  const examStudents = students.filter(s => isGradeTakingExam(s.grade));
+  const noSchedule = examStudents.filter(s => {
     const sch = appState.studentExamSchedules[s.studentId];
     return !sch || sch.length === 0;
   });
   if (noSchedule.length) {
     results.push({ level: 'warn', msg: `시험 일정이 없는 학생 ${noSchedule.length}명` });
-  } else if (students.length) {
-    results.push({ level: 'ok', msg: '모든 학생에게 시험 일정이 있습니다.' });
+  } else if (examStudents.length) {
+    results.push({ level: 'ok', msg: '모든 응시 학생에게 시험 일정이 있습니다.' });
+  }
+
+  const skippedGrades = ALL_GRADES.filter(g => !isGradeTakingExam(g));
+  if (skippedGrades.length) {
+    results.push({
+      level: 'ok',
+      msg: `미응시 학년 제외: ${describeGradeParticipationSummary()}`
+    });
   }
 
   const overflows = findCapacityOverflowDetails();
@@ -270,7 +280,7 @@ function runValidation() {
   }
 
   let moveCountMismatch = 0;
-  [1, 2, 3].forEach(g => {
+  getExamGrades().forEach(g => {
     const rule = getMoveRules(g);
     if (!rule.enabled) return;
     const classNos = [...new Set(Object.values(appState.students).filter(s => s.grade === g).map(s => s.classNo))];
@@ -289,13 +299,17 @@ function runValidation() {
   const moveColLabel = moveMode === 'odd' ? '홀수열' : '짝수열';
   const homeColLabel = getHomeColumnMode(moveMode) === 'odd' ? '홀수열' : '짝수열';
   let moveColMismatch = 0;
+  let splitRoomsChecked = 0;
   if (hasFixedRoomSeats()) {
     Object.values(appState.fixedRoomSeats).forEach(fs => {
       if (!usesSplitColumnLayout(fs.roomName) || !fs.col) return;
+      splitRoomsChecked++;
       const isMoveCol = isMoveColumn(fs.col, moveMode);
       if (!!fs.isMoveStudent !== isMoveCol) moveColMismatch++;
     });
-    if (moveColMismatch) {
+    if (splitRoomsChecked === 0) {
+      results.push({ level: 'ok', msg: '이동 유입 없는 교실은 전좌석 배치 적용' });
+    } else if (moveColMismatch) {
       results.push({ level: 'warn', msg: `본반/이동반 열 배치 불일치 ${moveColMismatch}건` });
     } else {
       results.push({ level: 'ok', msg: `본반(${homeColLabel})·이동반(${moveColLabel}) 배치 정상` });

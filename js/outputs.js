@@ -139,9 +139,14 @@ function formatElectiveStudentNumber(num) {
 }
 
 function getActiveGrades() {
-  return [...new Set(Object.values(appState.students).map(s => s.grade))]
-    .filter(g => Number.isFinite(g))
-    .sort((a, b) => a - b);
+  return getExamGrades().filter(g =>
+    Object.values(appState.students).some(s => s.grade === g) ||
+    getOrderedClassNosForGrade(g).length > 0
+  );
+}
+
+function getSeatMapBulkGrades() {
+  return getHostingGrades().filter(g => getOrderedClassNosForGrade(g).length > 0);
 }
 
 function getElectiveStudentGradesInRoom(roomName) {
@@ -871,7 +876,7 @@ function renderAttendanceDocument(f) {
 
 function getPeriodsForDay(day) {
   let max = 0;
-  [1, 2, 3].forEach(grade => {
+  getExamGrades().forEach(grade => {
     const periods = appState.timetable[grade]?.[day];
     if (!periods) return;
     Object.entries(periods).forEach(([p, subjects]) => {
@@ -908,6 +913,7 @@ function getSubjectForStudentSlot(studentId, day, period) {
 function getPersonalBoardClassKeys(grade) {
   const keys = new Map();
   Object.values(appState.students).forEach(s => {
+    if (!isGradeTakingExam(s.grade)) return;
     if (Number.isFinite(grade) && s.grade !== grade) return;
     keys.set(`${s.grade}-${s.classNo}`, { grade: s.grade, classNo: s.classNo });
   });
@@ -1032,7 +1038,7 @@ function renderPersonalDocument(f) {
 function getClassAssignmentData(day, grade, classNo) {
   const periods = appState.examMeta.periodsPerDay;
   const students = Object.values(appState.students)
-    .filter(s => s.grade === grade && s.classNo === classNo)
+    .filter(s => s.grade === grade && s.classNo === classNo && isGradeTakingExam(s.grade))
     .sort((a, b) => a.number - b.number);
 
   return students.map(st => {
@@ -1243,8 +1249,9 @@ function renderOutputDocumentAllGrades(type, f) {
   const grades = getActiveGrades();
   switch (type) {
     case 'seat-map': {
-      if (!grades.length) return '<p class="hint">학생 데이터가 없습니다.</p>';
-      const parts = grades.map(g => renderSeatMapDocument({ ...f, grade: g, bulkPrint: true }));
+      const seatGrades = getSeatMapBulkGrades();
+      if (!seatGrades.length) return '<p class="hint">출력할 교실이 없습니다.</p>';
+      const parts = seatGrades.map(g => renderSeatMapDocument({ ...f, grade: g, bulkPrint: true }));
       return `<div class="seat-map-batch seat-map-all-grades">${parts.join('')}</div>`;
     }
     case 'attendance': {
@@ -1286,7 +1293,8 @@ function renderFilterGroup(containerId, fields) {
   const container = $(`#${containerId}`);
   if (!container) return;
 
-  const grades = [1, 2, 3];
+  const useExamOnly = containerId === 'filters-personal' || containerId === 'filters-room-assignment';
+  const grades = (useExamOnly ? getExamGrades() : getHostingGrades());
   const days = Array.from({ length: appState.examMeta.days }, (_, i) => i + 1);
   const periods = Array.from({ length: appState.examMeta.periodsPerDay }, (_, i) => i + 1);
   const subjects = [...new Set(appState.examGroups.map(g => g.subject))].sort();
@@ -1294,7 +1302,10 @@ function renderFilterGroup(containerId, fields) {
   let html = '';
   if (fields.includes('grade')) {
     const allOpt = fields.includes('gradeOptional') ? '<option value="">전체</option>' : '';
-    html += `<label>학년 <select class="filter-grade">${allOpt}${grades.map(g => `<option value="${g}">${g}</option>`).join('')}</select></label>`;
+    const gradeOpts = grades.length
+      ? grades.map(g => `<option value="${g}">${g}</option>`).join('')
+      : '<option value="">-</option>';
+    html += `<label>학년 <select class="filter-grade">${allOpt}${gradeOpts}</select></label>`;
   }
   if (fields.includes('day')) {
     html += `<label>일차 <select class="filter-day">${days.map(d => `<option value="${d}">${d}일차</option>`).join('')}</select></label>`;
@@ -1833,8 +1844,9 @@ function buildClassBulkFiles(selections, grade, classNo) {
   const files = [];
   const days = getExamDayNumbers();
   const examRoom = getClassExamRoom(grade, classNo);
+  const takingExam = isGradeTakingExam(grade);
 
-  if (selections.personal) {
+  if (selections.personal && takingExam) {
     const html = renderPersonalBoardPage(grade, classNo);
     if (outputHtmlHasDocuments(html)) {
       files.push({
@@ -1845,7 +1857,7 @@ function buildClassBulkFiles(selections, grade, classNo) {
     }
   }
 
-  if (selections.roomAssignment) {
+  if (selections.roomAssignment && takingExam) {
     days.forEach(day => {
       const html = renderClassAssignmentPage(day, grade, classNo);
       if (outputHtmlHasDocuments(html)) {
@@ -2266,7 +2278,7 @@ function renderBulkGradeClassTree() {
   );
   closeAllBulkClassBubbles();
 
-  tree.innerHTML = [1, 2, 3].map(g => {
+  tree.innerHTML = getHostingGrades().map(g => {
     const classNos = getOrderedClassNosForGrade(g);
     const classItems = classNos.map(c => `
       <label class="class-bulk-check bulk-class-check">
@@ -2276,13 +2288,14 @@ function renderBulkGradeClassTree() {
     const empty = classNos.length
       ? ''
       : '<p class="bulk-grade-empty">반 목록이 없습니다. 고사실을 만들거나 학생을 업로드하세요.</p>';
+    const modeNote = getGradeParticipation(g) === 'host' ? ' · 교실만' : '';
     return `
       <div class="bulk-grade-item" data-grade="${g}">
         <div class="bulk-grade-row">
           <button type="button" class="bulk-grade-toggle" data-grade="${g}" aria-expanded="false" aria-haspopup="dialog">
             <span class="bulk-grade-caret" aria-hidden="true">▸</span>
             <span class="bulk-grade-name">${g}학년</span>
-            <span class="bulk-grade-meta" data-grade-meta="${g}">${classNos.length}개 반</span>
+            <span class="bulk-grade-meta" data-grade-meta="${g}">${classNos.length}개 반${modeNote}</span>
           </button>
           <label class="bulk-grade-pick" title="${g}학년 전체 선택">
             <input type="checkbox" data-bulk-grade="${g}">
@@ -2297,7 +2310,7 @@ function renderBulkGradeClassTree() {
           <div class="bulk-class-grid">${classItems || empty}</div>
         </div>
       </div>`;
-  }).join('');
+  }).join('') || '<p class="hint">참여 중인 학년이 없습니다. 운영설정에서 학년별 참여를 확인하세요.</p>';
 
   prevSelected.forEach(value => {
     const cb = tree.querySelector(`[data-bulk-class][value="${value}"]`);
@@ -2306,7 +2319,7 @@ function renderBulkGradeClassTree() {
   prevOpen.forEach(grade => {
     setBulkGradeOpen(tree.querySelector(`.bulk-grade-item[data-grade="${grade}"]`), true);
   });
-  [1, 2, 3].forEach(g => syncBulkGradeChecks(g));
+  getHostingGrades().forEach(g => syncBulkGradeChecks(g));
   syncBulkSelectAllClasses();
 }
 
@@ -2368,7 +2381,7 @@ function initClassBulkExportUI() {
         cb.indeterminate = false;
       });
       t.indeterminate = false;
-      [1, 2, 3].forEach(g => updateBulkGradeMeta(g));
+      getHostingGrades().forEach(g => updateBulkGradeMeta(g));
       return;
     }
     if (t.matches('[data-bulk-grade]')) {

@@ -314,17 +314,21 @@ function findCapacityOverflowDetails() {
   if (appState.examGroups.length || hasFixedRoomSeats()) {
     getClassRooms().forEach(room => {
       const residents = getResidentsForRoom(room.name);
-      const caps = getSplitSeatCapacities(seatConfig.rows, seatConfig.cols, seatConfig.moveStudentColumnMode);
       const homeCount = residents.filter(id => !isMoveTargetStudent(appState.students[id])).length;
       const moveCount = residents.length - homeCount;
       if (residents.length > room.capacity) {
         overflows.push({ day: 0, period: 0, roomName: room.name, count: residents.length, capacity: room.capacity });
       }
-      if (homeCount > caps.home) {
-        overflows.push({ day: 0, period: 0, roomName: room.name, count: homeCount, capacity: caps.home, label: '본반 좌석' });
-      }
-      if (moveCount > caps.move) {
-        overflows.push({ day: 0, period: 0, roomName: room.name, count: moveCount, capacity: caps.move, label: '이동반 좌석' });
+      if (roomHasIncomingMovers(room.name, residents)) {
+        const caps = getSplitSeatCapacities(seatConfig.rows, seatConfig.cols, seatConfig.moveStudentColumnMode);
+        if (homeCount > caps.home) {
+          overflows.push({ day: 0, period: 0, roomName: room.name, count: homeCount, capacity: caps.home, label: '본반 좌석' });
+        }
+        if (moveCount > caps.move) {
+          overflows.push({ day: 0, period: 0, roomName: room.name, count: moveCount, capacity: caps.move, label: '이동반 좌석' });
+        }
+      } else if (residents.length > maxSeats) {
+        overflows.push({ day: 0, period: 0, roomName: room.name, count: residents.length, capacity: maxSeats, label: '전좌석' });
       }
     });
     return overflows;
@@ -367,7 +371,11 @@ function getPlacementBlockingErrors() {
 }
 
 function getUnassignedStudentCount() {
-  return Object.keys(appState.students).filter(id => !appState.fixedRoomSeats?.[id]).length;
+  return Object.keys(appState.students).filter(id => {
+    const st = appState.students[id];
+    if (!st || !isGradeTakingExam(st.grade)) return false;
+    return !appState.fixedRoomSeats?.[id];
+  }).length;
 }
 
 function getOperationDiagnosisErrors() {
@@ -457,6 +465,7 @@ function checkOutputConsistency() {
   const periods = appState.examMeta.periodsPerDay;
 
   [1, 2, 3].forEach(grade => {
+    if (!isGradeTakingExam(grade)) return;
     for (let day = 1; day <= days; day++) {
       for (let period = 1; period <= periods; period++) {
         getRoomsForSession(grade, day, period).forEach(room => {
@@ -521,9 +530,22 @@ function runOperationDiagnosis() {
       }
     }
 
-    let noSchedule = studentIds.filter(id => !(appState.studentExamSchedules[id] || []).length).length;
+    let noSchedule = studentIds.filter(id => {
+      const st = appState.students[id];
+      if (!st || !isGradeTakingExam(st.grade)) return false;
+      return !(appState.studentExamSchedules[id] || []).length;
+    }).length;
     if (noSchedule) {
       items.push({ category: '학생', status: 'warning', message: `시험 일정 없는 학생 ${noSchedule}명` });
+    }
+
+    const skipped = ALL_GRADES.filter(g => !isGradeTakingExam(g));
+    if (skipped.length) {
+      items.push({
+        category: '운영',
+        status: 'ok',
+        message: `학년 참여: ${describeGradeParticipationSummary()}`
+      });
     }
   }
 
@@ -728,8 +750,9 @@ function exportSettingsTemplate() {
   collectAllSettings();
   const template = {
     _type: 'examflow-template',
-    _version: '0.8',
+    _version: '0.9',
     examMeta: { ...appState.examMeta },
+    gradeParticipation: JSON.parse(JSON.stringify(appState.examRules.gradeParticipation || { 1: 'exam', 2: 'exam', 3: 'exam' })),
     moveRules: JSON.parse(JSON.stringify(appState.examRules.movementRules)),
     seatConfig: JSON.parse(JSON.stringify(appState.examRules.seatDefaults)),
     rooms: JSON.parse(JSON.stringify(appState.rooms))
@@ -752,11 +775,16 @@ function importSettingsTemplate(file) {
       }
       if (guardIfLocked('설정 템플릿 불러오기')) return;
       if (data.examMeta) Object.assign(appState.examMeta, data.examMeta);
+      if (data.gradeParticipation) {
+        appState.examRules.gradeParticipation = data.gradeParticipation;
+      }
       if (data.moveRules) appState.examRules.movementRules = data.moveRules;
       if (data.seatConfig) {
         appState.examRules.seatDefaults = data.seatConfig;
         migrateLoadedState();
       }
+      ensureGradeParticipationState();
+      sanitizeMovementRulesForParticipation();
       if (data.rooms) appState.rooms = data.rooms;
       restoreUI();
       syncStateToWindow();

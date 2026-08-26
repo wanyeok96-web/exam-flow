@@ -25,9 +25,11 @@ function setSaveStatus(text) {
 
 function collectAllSettings() {
   collectMetaFromDOM();
+  collectGradeParticipationFromDOM();
   collectTimetableFromDOM();
   collectMovementRulesFromDOM();
   collectSeatDefaultsFromDOM();
+  sanitizeMovementRulesForParticipation();
   $$('.room-capacity-input').forEach(input => {
     const idx = parseInt(input.dataset.idx, 10);
     if (appState.rooms[idx]) appState.rooms[idx].capacity = parseInt(input.value, 10);
@@ -84,7 +86,10 @@ function migrateToFixedRoomSeats() {
 }
 
 function migrateLoadedState() {
+  ensureGradeParticipationState();
   normalizeMoveRulesInState();
+  sanitizeMovementRulesForParticipation();
+  pruneNonExamOperationalData();
   if (appState.examRules.seatDefaults) {
     const sd = appState.examRules.seatDefaults;
     const legacyMap = { 'odd-columns': 'odd', 'even-columns': 'even', none: 'even' };
@@ -216,12 +221,15 @@ function invalidateSteps(...steps) {
 
 function renderStep1UI() {
   renderExamDates();
+  renderGradeParticipation();
   renderUnifiedTimetable();
   renderMovementRules();
+  renderMovementOverviewSummary();
   renderMovementPreviewSelect();
   renderSeatConfigPreview();
   renderRoomsGradeSetup();
   renderRoomsList();
+  renderOpsSetupOverview();
   stepUIReady['1'] = true;
 }
 
@@ -373,17 +381,27 @@ function initEvents() {
   });
   $('#btn-save-timetable').addEventListener('click', saveTimetable);
 
+  $('#grade-participation-container')?.addEventListener('change', e => {
+    if (e.target.classList.contains('grade-participation-mode')) {
+      applyGradeParticipationChange();
+    }
+  });
+
   $('#movement-rules-container').addEventListener('change', e => {
     if (e.target.classList.contains('movement-mode') || e.target.classList.contains('movement-enabled')) {
       syncMovementModePanels(e.target.closest('.movement-grade-block') || document);
     }
     saveMovementRules();
+    renderMovementOverviewSummary();
     renderMovementPreview();
   });
   $('#movement-rules-container').addEventListener('input', () => {
     collectMovementRulesFromDOM();
     clearTimeout(movementPreviewDebounce);
-    movementPreviewDebounce = setTimeout(renderMovementPreview, 120);
+    movementPreviewDebounce = setTimeout(() => {
+      renderMovementOverviewSummary();
+      renderMovementPreview();
+    }, 120);
   });
   $('#movement-preview-select')?.addEventListener('change', renderMovementPreview);
   ['#seat-rows', '#seat-cols', '#seat-fill-direction', '#seat-move-column', '#seat-door-side'].forEach(sel => {

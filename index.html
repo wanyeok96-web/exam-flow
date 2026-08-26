@@ -108,7 +108,7 @@
       <div class="card section-card">
         <h2 class="card__title"><span class="card-icon" aria-hidden="true">✨</span> 이 프로그램으로 할 수 있는 일</h2>
         <ul class="guide-list">
-          <li>학년별 이동 규칙과 고사실을 정합니다.</li>
+          <li>학년별 참여(응시·교실만 제공·미참여), 이동·잔류 규칙, 고사실을 정합니다.</li>
           <li>나이스 엑셀을 올려 응시 명단을 만듭니다.</li>
           <li>교실·좌석을 자동 배정한 뒤 확인하고 고칩니다.</li>
           <li>좌석배치도, 결시현황표, 개인 시간표 등을 인쇄하거나 PDF로 받습니다.</li>
@@ -120,7 +120,7 @@
           <li>
             <div>
               <strong>운영설정</strong>
-              <p>학교명, 시험 일정, 시간표, 학년별 이동 방식, 좌석 기본값, 고사실을 정합니다. 같은 교시에 선택과목이 여러 개면 <code>/</code>로 구분합니다.</p>
+              <p>학교명·시험 일정 → <strong>학년별 참여</strong> → 시간표 → 이동·잔류 → 좌석 → 고사실 순으로 정합니다. 같은 교시 선택과목은 <code>/</code>로 구분합니다.</p>
             </div>
             <button type="button" class="btn btn-secondary btn-sm" data-goto-step="1">이 단계로</button>
           </li>
@@ -234,9 +234,21 @@
             </h1>
             <button type="button" class="btn btn-secondary btn-sm btn-page-tour no-print" data-tour="1">튜토리얼</button>
           </div>
-          <p class="page-desc">학교·시험 기본 정보, 시간표, 이동 방식, 좌석·고사실을 설정합니다.</p>
+          <p class="page-desc">아래 순서로 설정합니다: 참여 → 시간표 → 이동·잔류 → 좌석 → 고사실.</p>
         </div>
       </div>
+
+      <div id="ops-setup-overview" class="ops-setup-overview no-print" aria-live="polite">
+        <ol class="ops-setup-flow" aria-label="운영설정 순서">
+          <li><span class="ops-flow-num">1</span>참여</li>
+          <li><span class="ops-flow-num">2</span>시간표</li>
+          <li><span class="ops-flow-num">3</span>이동·잔류</li>
+          <li><span class="ops-flow-num">4</span>좌석</li>
+          <li><span class="ops-flow-num">5</span>고사실</li>
+        </ol>
+        <p id="ops-setup-live-summary" class="ops-setup-live">설정을 고르면 여기에 요약이 표시됩니다.</p>
+      </div>
+
       <div class="card section-card" data-tour-title="학교 정보" data-tour-body="출력물 상단에 표시할 학교명을 입력합니다.">
         <h2 class="card__title"><span class="card-icon" aria-hidden="true">🏫</span> 학교 정보</h2>
         <p class="hint">출력물 상단에 학교명이 표시됩니다. 학년도·학기는 아래 시험 기본 정보를 따릅니다.</p>
@@ -263,16 +275,24 @@
         <button type="button" id="btn-apply-meta" class="btn btn-primary">기본 정보 적용</button>
       </div>
 
-      <div class="card section-card" data-tour-title="시험 시간표" data-tour-body="학년·일차·교시별 과목을 입력합니다. 같은 교시에 선택과목이 여러 개면 슬래시(/)로 구분하세요.">
-        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🗓️</span> 시험 시간표</h2>
+      <div class="card section-card" data-tour-title="학년별 참여" data-tour-body="가장 먼저 정합니다. 응시 학년만 시간표·이동·좌석·출력에 들어갑니다. 교실만 제공은 미응시이지만 타학년이 그 교실로 이동할 때 씁니다. 미참여는 이번 고사에서 완전히 빠집니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">👥</span> <span class="ops-card-step">1</span> 학년별 참여</h2>
+        <p class="hint">3학년만 시험을 안 보면 「미참여」 또는 「교실만 제공」을 고르세요. 1·2학년이 3학년 교실을 쓰면 「교실만 제공」입니다.</p>
+        <div id="grade-participation-container" class="grade-participation-grid"></div>
+        <p id="grade-participation-summary" class="hint grade-participation-summary"></p>
+      </div>
+
+      <div class="card section-card" data-tour-title="시험 시간표" data-tour-body="응시 학년만 표시됩니다. 학년·일차·교시별 과목을 입력하고, 같은 교시 선택과목은 슬래시(/)로 구분하세요.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🗓️</span> <span class="ops-card-step">2</span> 시험 시간표</h2>
         <p class="hint">같은 교시에 여러 선택과목이 있으면 <code>/</code>로 구분해 입력하세요. (예: 기하 / 영어권 문화)</p>
         <div id="timetable-container"></div>
         <button type="button" id="btn-save-timetable" class="btn btn-primary">시간표 저장</button>
       </div>
 
-      <div class="card section-card" data-tour-title="학년별 이동 방식" data-tour-body="학년마다 이동할 교실과 대상을 정합니다. 앞번호부터·뒷번호부터·번호부터 N명·번호 범위 중 하나를 고르면 아래 안내 문장이 바뀝니다. 결번은 건너뛰고 목표 인원만큼 선택합니다.">
-        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🧭</span> 학년별 이동 방식</h2>
-        <p class="hint hint-nowrap">학년마다 이동 교실과 대상을 정합니다. 앞·뒷번호부터 인원만 넣거나, 시작 번호부터 N명, 번호 범위를 직접 지정할 수 있습니다. 결번은 건너뛰고 목표 인원만큼 선택합니다.</p>
+      <div class="card section-card" data-tour-title="학년별 이동·잔류" data-tour-body="응시 학년마다 다른 학년 교실로 이동할지, 본반에 남을지 정합니다. 체크를 끄면 본반 잔류입니다. 결번은 건너뛰고 목표 인원만큼 선택합니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🧭</span> <span class="ops-card-step">3</span> 학년별 이동·잔류</h2>
+        <p class="hint">「다른 학년 교실로 이동」을 끈 학년은 본인 학급에서 시험 칩니다. 켠 학년만 아래 방식(앞·뒷번호, 범위 등)으로 이동 대상을 고릅니다.</p>
+        <div id="movement-overview-summary" class="movement-overview-summary" aria-live="polite"></div>
         <div id="movement-rules-container" class="movement-rules-grid"></div>
         <div class="movement-preview-picker">
           <label>이동 대상 미리보기
@@ -282,8 +302,8 @@
         <div id="movement-preview-container" class="movement-preview"></div>
       </div>
 
-      <div class="card section-card" data-tour-title="좌석 배치 기본값" data-tour-body="교실 행·열, 채움 방향, 이동반이 앉을 열, 출입문 위치를 정합니다. 아래 미리보기로 배치를 확인할 수 있습니다.">
-        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🪑</span> 좌석 배치 기본값</h2>
+      <div class="card section-card" data-tour-title="좌석 배치 기본값" data-tour-body="교실 행·열, 채움 방향, 이동반 열, 출입문 위치를 정합니다. 이동 유입이 없는 교실은 전좌석을 쓰고, 유입이 있으면 본반·이동반 열을 나눕니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🪑</span> <span class="ops-card-step">4</span> 좌석 배치 기본값</h2>
         <div class="form-inline-row seat-config-row">
           <label>행 수 <input type="number" id="seat-rows" value="6" min="1"></label>
           <label>열 수 <input type="number" id="seat-cols" value="4" min="1"></label>
@@ -309,12 +329,12 @@
             </select>
           </label>
         </div>
-        <p class="hint seat-config-hint">교실(반): 본반·이동반 열을 나누어 배치하며, 좌석번호는 각각 1번부터 (열 단위 위→아래)</p>
+        <p class="hint seat-config-hint">본반만 있는 교실(예: 이동하지 않는 3학년)은 전좌석 배치입니다. 아래 미리보기는 이동 유입이 있을 때의 예시입니다.</p>
         <div id="seat-config-preview" class="seat-config-preview"></div>
       </div>
 
-      <div class="card section-card" data-tour-title="고사실 목록" data-tour-body="학년별 학급 교실을 생성하고, 특별실·대기실을 추가합니다.">
-        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🏛️</span> 고사실 목록</h2>
+      <div class="card section-card" data-tour-title="고사실 목록" data-tour-body="응시·교실만 제공 학년의 학급 교실을 만들고, 특별실·대기실을 추가합니다. 미참여 학년은 교실 생성이 비활성입니다.">
+        <h2 class="card__title"><span class="card-icon" aria-hidden="true">🏛️</span> <span class="ops-card-step">5</span> 고사실 목록</h2>
         <div id="rooms-setup-grid" class="rooms-setup-grid"></div>
         <div id="rooms-list-container"></div>
       </div>
@@ -426,7 +446,7 @@
 
       <div class="card section-card" data-tour-title="교실별 배치 현황" data-tour-body="본반 학생과 이동해 온 학생이 교실에 어떻게 나뉘는지 보여 줍니다. 과목별 고사실을 따로 고를 필요는 없습니다.">
         <h2 class="card__title"><span class="card-icon" aria-hidden="true">🏫</span> 교실별 배치 현황</h2>
-        <p class="hint">반=교실 원칙으로 본 반 학생(이동 제외)과 이동반 유입 학생이 자동 계산됩니다. 과목별 고사실 수동 배정은 필요 없습니다.</p>
+        <p class="hint">반=교실 원칙으로 본 반 학생(이동 제외)과 이동반 유입 학생이 자동 계산됩니다. 이동 유입이 없는 교실은 전좌석 배치입니다.</p>
         <div id="room-occupancy-panel"></div>
       </div>
 

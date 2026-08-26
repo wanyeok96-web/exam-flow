@@ -21,6 +21,8 @@ const appState = {
     dates: {}
   },
   examRules: {
+    /** exam=응시, host=미응시·교실만 제공, off=완전 미참여 */
+    gradeParticipation: { 1: 'exam', 2: 'exam', 3: 'exam' },
     movementRules: {
       1: { enabled: false, targetGrade: null, mode: 'from-front', count: 14, rangeStart: 1, rangeEnd: 14 },
       2: { enabled: false, targetGrade: 1, mode: 'from-front', count: 14, rangeStart: 1, rangeEnd: 14 },
@@ -108,6 +110,128 @@ function showEl(el, show) {
   el.classList.toggle('hidden', !show);
 }
 
+/* ========== Grade Participation ========== */
+
+const ALL_GRADES = [1, 2, 3];
+const GRADE_PARTICIPATION_MODES = ['exam', 'host', 'off'];
+const GRADE_PARTICIPATION_LABELS = {
+  exam: '응시',
+  host: '교실만 제공',
+  off: '미참여'
+};
+
+const GRADE_PARTICIPATION_HINTS = {
+  exam: '시간표·이동·좌석·출력에 포함',
+  host: '미응시 · 타학년 이동 교실로만 사용',
+  off: '이번 고사에서 완전 제외'
+};
+
+function normalizeGradeParticipationMode(mode) {
+  return GRADE_PARTICIPATION_MODES.includes(mode) ? mode : 'exam';
+}
+
+function ensureGradeParticipationState() {
+  if (!appState.examRules.gradeParticipation) {
+    appState.examRules.gradeParticipation = { 1: 'exam', 2: 'exam', 3: 'exam' };
+  }
+  ALL_GRADES.forEach(g => {
+    appState.examRules.gradeParticipation[g] = normalizeGradeParticipationMode(
+      appState.examRules.gradeParticipation[g]
+    );
+  });
+}
+
+function getGradeParticipation(grade) {
+  ensureGradeParticipationState();
+  return appState.examRules.gradeParticipation[grade] || 'exam';
+}
+
+/** 이번 고사에 응시하는 학년 */
+function isGradeTakingExam(grade) {
+  return getGradeParticipation(grade) === 'exam';
+}
+
+/** 학급 교실을 고사실로 쓰는 학년 (응시 또는 교실만 제공) */
+function isGradeHostingRooms(grade) {
+  const mode = getGradeParticipation(grade);
+  return mode === 'exam' || mode === 'host';
+}
+
+function getExamGrades() {
+  return ALL_GRADES.filter(isGradeTakingExam);
+}
+
+function getHostingGrades() {
+  return ALL_GRADES.filter(isGradeHostingRooms);
+}
+
+function describeGradeParticipationSummary() {
+  const exam = getExamGrades();
+  const host = ALL_GRADES.filter(g => getGradeParticipation(g) === 'host');
+  const off = ALL_GRADES.filter(g => getGradeParticipation(g) === 'off');
+  const parts = [];
+  if (exam.length) parts.push(`${exam.join('·')}학년 응시`);
+  if (host.length) parts.push(`${host.join('·')}학년 교실만 제공`);
+  if (off.length) parts.push(`${off.join('·')}학년 미참여`);
+  return parts.join(' · ') || '학년 참여 설정을 확인하세요';
+}
+
+/** 응시 학년의 이동/본반 잔류 한줄 요약 */
+function describeMovementOverviewSummary() {
+  const parts = [];
+  getExamGrades().forEach(g => {
+    const rule = getMoveRules(g);
+    if (rule.enabled && rule.targetGrade) {
+      parts.push(`${g}학년→${rule.targetGrade}학년 (${describeMoveRule(rule)})`);
+    } else {
+      parts.push(`${g}학년 본반 잔류`);
+    }
+  });
+  ALL_GRADES.filter(g => getGradeParticipation(g) === 'host').forEach(g => {
+    parts.push(`${g}학년 교실 제공`);
+  });
+  ALL_GRADES.filter(g => getGradeParticipation(g) === 'off').forEach(g => {
+    parts.push(`${g}학년 미참여`);
+  });
+  return parts.join(' · ') || '이동·잔류 설정을 확인하세요';
+}
+
+function describeOpsSetupLiveSummary() {
+  return `${describeGradeParticipationSummary()} ｜ ${describeMovementOverviewSummary()}`;
+}
+
+function sanitizeMovementRulesForParticipation() {
+  ensureGradeParticipationState();
+  ALL_GRADES.forEach(g => {
+    const rule = appState.examRules.movementRules[g];
+    if (!rule) return;
+    if (!isGradeTakingExam(g)) {
+      rule.enabled = false;
+    }
+    if (rule.targetGrade != null && !isGradeHostingRooms(rule.targetGrade)) {
+      rule.targetGrade = null;
+      rule.enabled = false;
+    }
+  });
+}
+
+/** 미응시 학년의 일정·그룹·고정좌석 정리 */
+function pruneNonExamOperationalData() {
+  Object.keys(appState.studentExamSchedules || {}).forEach(id => {
+    const st = appState.students[id];
+    if (!st || !isGradeTakingExam(st.grade)) delete appState.studentExamSchedules[id];
+  });
+  appState.examGroups = (appState.examGroups || []).filter(g => isGradeTakingExam(g.grade));
+  Object.keys(appState.fixedRoomSeats || {}).forEach(id => {
+    const st = appState.students[id];
+    if (!st || !isGradeTakingExam(st.grade)) delete appState.fixedRoomSeats[id];
+  });
+  Object.keys(appState.seatAssignments || {}).forEach(id => {
+    const st = appState.students[id];
+    if (!st || !isGradeTakingExam(st.grade)) delete appState.seatAssignments[id];
+  });
+}
+
 /* ========== Move Rules (이동반) ========== */
 
 const MOVE_MODES = ['from-front', 'from-back', 'from-number', 'range'];
@@ -169,7 +293,9 @@ function normalizeMoveRulesInState() {
 
 function getMoveTargetStudentIdsByClass(grade, classNo) {
   const rule = getMoveRules(grade);
+  if (!isGradeTakingExam(grade)) return [];
   if (!rule.enabled || !rule.targetGrade) return [];
+  if (!isGradeHostingRooms(rule.targetGrade)) return [];
 
   const students = Object.values(appState.students)
     .filter(s => s.grade === grade && s.classNo === classNo)
@@ -332,16 +458,21 @@ function hasFixedRoomSeats() {
 function getResidentsForRoom(roomName) {
   const parsed = parseClassRoomName(roomName);
   if (!parsed) return [];
+  if (!isGradeHostingRooms(parsed.grade)) return [];
 
   rebuildMoveTargetCache();
   const { grade: homeGrade, classNo: homeClassNo } = parsed;
   const residentIds = new Set();
 
-  getStudentsInClass(homeGrade, homeClassNo).forEach(s => {
-    if (!isMoveTargetStudent(s)) residentIds.add(s.studentId);
-  });
+  // 본반 잔류: 응시 학년만 (host/off 학년 학생은 좌석·출력 제외)
+  if (isGradeTakingExam(homeGrade)) {
+    getStudentsInClass(homeGrade, homeClassNo).forEach(s => {
+      if (!isMoveTargetStudent(s)) residentIds.add(s.studentId);
+    });
+  }
 
   Object.values(appState.students).forEach(s => {
+    if (!isGradeTakingExam(s.grade)) return;
     if (isMoveTargetStudent(s) && getFixedRoomForStudent(s.studentId) === roomName) {
       residentIds.add(s.studentId);
     }
@@ -453,10 +584,14 @@ function assignFixedSeats() {
     const residents = getResidentsForRoom(room.name);
     if (!residents.length) return;
 
-    const caps = getSplitSeatCapacities(seatConfig.rows, seatConfig.cols, seatConfig.moveStudentColumnMode);
     const homeCount = residents.filter(id => !isMoveTargetStudent(appState.students[id])).length;
     const moveCount = residents.length - homeCount;
-    if (homeCount > caps.home || moveCount > caps.move) overflowCount++;
+    if (roomHasIncomingMovers(room.name, residents)) {
+      const caps = getSplitSeatCapacities(seatConfig.rows, seatConfig.cols, seatConfig.moveStudentColumnMode);
+      if (homeCount > caps.home || moveCount > caps.move) overflowCount++;
+    } else if (residents.length > seatConfig.rows * seatConfig.cols) {
+      overflowCount++;
+    }
 
     const results = assignSeatsForRoom(room.name, residents, {}, seatConfig);
     results.forEach(r => {
@@ -518,30 +653,39 @@ function renderRoomOccupancyPanel() {
   let html = '<table class="data-table"><thead><tr>' +
     '<th>교실</th><th>배치 인원</th><th>정원</th><th>좌석 수</th><th>상태</th></tr></thead><tbody>';
 
-  const caps = getSplitSeatCapacities(seatConfig.rows, seatConfig.cols, seatConfig.moveStudentColumnMode);
+  const splitCaps = getSplitSeatCapacities(seatConfig.rows, seatConfig.cols, seatConfig.moveStudentColumnMode);
+  const fullCap = seatConfig.rows * seatConfig.cols;
   classRooms.forEach(room => {
     const residents = getResidentsForRoom(room.name);
     const homeCount = residents.filter(id => !isMoveTargetStudent(appState.students[id])).length;
     const moveCount = residents.length - homeCount;
+    const split = roomHasIncomingMovers(room.name, residents);
     const overCap = residents.length > room.capacity;
-    const overHome = homeCount > caps.home;
-    const overMove = moveCount > caps.move;
-    const status = overHome || overMove
+    const overSeats = split
+      ? (homeCount > splitCaps.home || moveCount > splitCaps.move)
+      : residents.length > fullCap;
+    const status = overSeats
       ? '<span class="validation-error">좌석 초과</span>'
       : overCap
         ? '<span class="validation-warn">정원 초과</span>'
         : '<span class="validation-ok">정상</span>';
+    const peopleLabel = split
+      ? `${residents.length}명 (본 반 ${homeCount} · 이동반 ${moveCount})`
+      : `${residents.length}명 (본반만)`;
+    const seatLabel = split
+      ? `본반 ${splitCaps.home} · 이동반 ${splitCaps.move}`
+      : `전좌석 ${fullCap}`;
     html += `<tr>
       <td>${room.name}</td>
-      <td>${residents.length}명 (본 반 ${homeCount} · 이동반 ${moveCount})</td>
+      <td>${peopleLabel}</td>
       <td>${room.capacity}명</td>
-      <td>본반 ${caps.home} · 이동반 ${caps.move}</td>
+      <td>${seatLabel}</td>
       <td>${status}</td>
     </tr>`;
   });
 
   html += '</tbody></table>';
-  html += '<p class="hint" style="margin-top:0.5rem">반=교실 원칙: 본 반 학생(이동 제외) + 이동반 유입 학생이 각 교실에 배치됩니다.</p>';
+  html += '<p class="hint" style="margin-top:0.5rem">반=교실 원칙: 이동 유입이 있으면 본반·이동반 열 분리, 없으면 전좌석을 본반 기준으로 배치합니다.</p>';
   panel.innerHTML = html;
 }
 
@@ -613,20 +757,21 @@ function renderSeatConfigPreview() {
   const doorSide = $('#seat-door-side')?.value || 'left';
   const moveMode = seatConfig.moveStudentColumnMode;
   const { rows, cols } = seatConfig;
-  const classRoom = '1-1';
 
+  // 설정 미리보기는 「이동 유입 교실」분리 배치 예시 (실제 배정은 교실별 유입 여부로 분기)
   const classTable = buildSeatPreviewTable(rows, cols, (r, c) => ({
-    label: getSplitSeatLabelAtCoord(classRoom, r, c, seatConfig),
+    label: getSplitSeatLabelAtCoord('1-1', r, c, seatConfig),
     groupClass: isMoveColumn(c, moveMode) ? 'seat-preview-move' : 'seat-preview-home'
   }));
   const classCaps = getSplitSeatCapacities(rows, cols, moveMode);
   const moveColLabel = moveMode === 'odd' ? '홀수열' : '짝수열';
+  const fullCap = rows * cols;
 
   container.innerHTML = `
-    <p class="seat-preview-title">좌석 배치 미리보기 <span class="seat-preview-meta">${rows}행 × ${cols}열 · 본반 ${classCaps.home}석 · 이동반 ${classCaps.move}석</span></p>
+    <p class="seat-preview-title">이동 유입 시 미리보기 <span class="seat-preview-meta">${rows}행 × ${cols}열 · 본반 ${classCaps.home}석 · 이동반 ${classCaps.move}석</span></p>
     ${classTable}
     <div class="seat-map-footer seat-preview-footer"><div class="door-marker door-${doorSide}">🚪 출입문</div></div>
-    <p class="hint seat-preview-legend">회색 음영: ${moveColLabel} · 이동반</p>`;
+    <p class="hint seat-preview-legend">회색 음영: ${moveColLabel} · 이동반. 이동 유입이 없는 교실은 전좌석 ${fullCap}석을 순서대로 사용합니다.</p>`;
 }
 
 /* ========== Seat Config & Algorithm ========== */
@@ -654,12 +799,39 @@ function isMoveColumn(col, moveMode) {
   return moveMode === 'odd' ? col % 2 === 1 : col % 2 === 0;
 }
 
-/** 교실 좌석: 본반·이동반 열 분리 (열 단위 위→아래 채움, 번호 각각 1번부터) */
-function usesSplitColumnLayout(roomName) {
-  return !!parseClassRoomName(roomName);
+/** 교실에 이동 유입 학생이 있는지 (배정 시 studentIds 전달 가능) */
+function roomHasIncomingMovers(roomName, studentIds) {
+  if (!parseClassRoomName(roomName)) return false;
+
+  if (Array.isArray(studentIds)) {
+    return studentIds.some(id => {
+      const st = appState.students[id];
+      return st && isMoveTargetStudent(st);
+    });
+  }
+
+  const fixed = appState.fixedRoomSeats || {};
+  let sawRoom = false;
+  for (const fs of Object.values(fixed)) {
+    if (fs.roomName !== roomName) continue;
+    sawRoom = true;
+    if (fs.isMoveStudent || fs.seatGroup === 'move') return true;
+  }
+  if (sawRoom) return false;
+
+  return getResidentsForRoom(roomName).some(id => isMoveTargetStudent(appState.students[id]));
 }
 
-/** 교실 좌석번호 표기: 본반1~N, 이동1~N */
+/**
+ * 교실 좌석: 이동 유입이 있을 때만 본반·이동반 열 분리.
+ * 유입이 없으면 전좌석을 채움 방향대로 사용.
+ */
+function usesSplitColumnLayout(roomName, studentIds) {
+  if (!parseClassRoomName(roomName)) return false;
+  return roomHasIncomingMovers(roomName, studentIds);
+}
+
+/** 교실 좌석번호 표기: 분리 시 본반1~N / 이동1~N, 비분리 시 숫자만 */
 function formatSeatNumberLabel(seatNo, options = {}) {
   if (seatNo == null || seatNo === '' || seatNo === '-') return '-';
   const n = parseInt(seatNo, 10);
@@ -681,18 +853,17 @@ function formatSeatLabelForStudent(studentId, seatNo, roomName) {
   });
 }
 
+/** 분리 배치 좌표 → 본반N/이동N 라벨 (설정 미리보기용, 항상 분리 가정) */
 function getSplitSeatLabelAtCoord(roomName, row, col, seatConfig) {
-  if (!usesSplitColumnLayout(roomName)) return null;
   const { rows, cols } = seatConfig;
   const moveMode = normalizeMoveColumnMode(seatConfig.moveStudentColumnMode);
-  const groupParity = isMoveColumn(col, moveMode) ? moveMode : getHomeColumnMode(moveMode);
+  const isMove = isMoveColumn(col, moveMode);
+  const groupParity = isMove ? moveMode : getHomeColumnMode(moveMode);
   const pos = generateGroupColumnPositions(rows, cols, groupParity)
     .find(p => p.row === row && p.col === col);
   if (!pos) return '';
-  return formatSeatNumberLabel(pos.seatNo, {
-    seatGroup: isMoveColumn(col, moveMode) ? 'move' : 'home',
-    roomName
-  });
+  const n = pos.seatNo;
+  return isMove ? `이동${n}` : `본반${n}`;
 }
 
 function generateGroupColumnPositions(rows, cols, parity) {
@@ -728,9 +899,11 @@ function resolveSeatRowCol(roomName, seatNo, seatGroup, isMoveStudent) {
   const num = parseInt(seatNo, 10);
   if (!roomName || !Number.isFinite(num) || num < 1) return null;
 
-  if (usesSplitColumnLayout(roomName)) {
+  const isMove = seatGroup === 'move' || !!isMoveStudent;
+  // 좌석 해석: 이동생·이동 그룹이면 분리 좌표, 그 외는 교실 실제 분리 여부 따름
+  const useSplit = isMove || usesSplitColumnLayout(roomName);
+  if (useSplit && parseClassRoomName(roomName)) {
     const moveMode = normalizeMoveColumnMode(seatConfig.moveStudentColumnMode);
-    const isMove = seatGroup === 'move' || isMoveStudent;
     const parity = isMove ? moveMode : getHomeColumnMode(moveMode);
     const pos = generateGroupColumnPositions(seatConfig.rows, seatConfig.cols, parity)
       .find(p => p.seatNo === num);
@@ -831,59 +1004,27 @@ function isMoverPreferredColumn(col, mode) {
 }
 
 function assignSeatsForRoom(roomName, studentIds, context, seatConfig) {
-  if (usesSplitColumnLayout(roomName)) {
+  if (usesSplitColumnLayout(roomName, studentIds)) {
     return assignSeatsSplitByColumn(roomName, studentIds, seatConfig);
   }
 
+  // 이동 유입 없음: 전좌석을 채움 방향대로 사용 (본반1… 아님, 1…N)
   const positions = generateSeatPositions(seatConfig.rows, seatConfig.cols, seatConfig.fillDirection);
   const sorted = sortStudentsByClass(studentIds);
   const results = [];
-  const used = new Set();
-
-  const takeFromPools = (pools) => {
-    for (const pool of pools) {
-      for (const p of pool) {
-        const k = `${p.row}-${p.col}`;
-        if (!used.has(k)) {
-          used.add(k);
-          return p;
-        }
-      }
-    }
-    return null;
-  };
-
-  const mode = normalizeMoveColumnMode(seatConfig.moveStudentColumnMode);
-  const moverPositions = positions.filter(p => isMoverPreferredColumn(p.col, mode));
-  const nonMoverPositions = positions.filter(p => !isMoverPreferredColumn(p.col, mode));
-
-  const movers = sorted.filter(id => isMoveTargetStudent(appState.students[id]));
-  const nonMovers = sorted.filter(id => !isMoveTargetStudent(appState.students[id]));
-
-  movers.forEach(id => {
-    const pos = takeFromPools([moverPositions, nonMoverPositions, positions]);
+  sorted.forEach((id, idx) => {
+    const pos = positions[idx];
     if (!pos) return;
+    const isMove = isMoveTargetStudent(appState.students[id]);
     results.push({
       studentId: id,
       seatNo: pos.seatNo,
       row: pos.row,
       col: pos.col,
-      isMoveStudent: true
+      isMoveStudent: !!isMove,
+      seatGroup: isMove ? 'move' : 'home'
     });
   });
-
-  nonMovers.forEach(id => {
-    const pos = takeFromPools([nonMoverPositions, moverPositions, positions]);
-    if (!pos) return;
-    results.push({
-      studentId: id,
-      seatNo: pos.seatNo,
-      row: pos.row,
-      col: pos.col,
-      isMoveStudent: false
-    });
-  });
-
   return results;
 }
 
