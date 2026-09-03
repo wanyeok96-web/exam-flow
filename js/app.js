@@ -261,7 +261,7 @@ function ensureStepUI(step) {
   if (stepUIReady[s]) {
     if (s === '5' && step5PreviewStale) {
       refreshOutputFilters();
-      refreshOutputPreview();
+      refreshOutputPreview({ refreshChrome: true });
       step5PreviewStale = false;
     }
     return;

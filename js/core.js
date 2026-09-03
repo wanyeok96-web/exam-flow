@@ -460,7 +460,7 @@ function getResidentsForRoom(roomName) {
   if (!parsed) return [];
   if (!isGradeHostingRooms(parsed.grade)) return [];
 
-  rebuildMoveTargetCache();
+  // moveTargetCache는 규칙·학생 변경 시에만 rebuild (매 호출 재구축 금지)
   const { grade: homeGrade, classNo: homeClassNo } = parsed;
   const residentIds = new Set();
 

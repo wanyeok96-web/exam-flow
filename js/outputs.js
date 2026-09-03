@@ -659,17 +659,32 @@ function getRoomsForSession(grade, day, period) {
   return sortClassRoomNames([...rooms]);
 }
 
+/** 출력물 페이지마다 검증을 반복하지 않도록 렌더 패스당 1회만 계산 */
+let _compactValidationWarnings = null;
+let _compactValidationInlineHtml = null;
+
+function clearCompactValidationCache() {
+  _compactValidationWarnings = null;
+  _compactValidationInlineHtml = null;
+}
+
 function renderDocValidationInline() {
+  if (_compactValidationInlineHtml !== null) return _compactValidationInlineHtml;
   const warnings = getCompactValidationWarnings();
-  if (!warnings.length) return '';
-  return `<div class="doc-validation-inline">⚠ ${warnings.join(' · ')}</div>`;
+  _compactValidationInlineHtml = warnings.length
+    ? `<div class="doc-validation-inline">⚠ ${warnings.join(' · ')}</div>`
+    : '';
+  return _compactValidationInlineHtml;
 }
 
 function getCompactValidationWarnings() {
+  if (_compactValidationWarnings) return _compactValidationWarnings;
+
   const warnings = [];
   const blocking = getPlacementBlockingErrors();
   if (blocking.length) {
-    return blocking.map(msg => `출력불가: ${msg}`);
+    _compactValidationWarnings = blocking.map(msg => `출력불가: ${msg}`);
+    return _compactValidationWarnings;
   }
   const dupes = findDuplicateSeats();
   if (dupes.length) warnings.push(`좌석 중복 ${dupes.length}건`);
@@ -681,6 +696,7 @@ function getCompactValidationWarnings() {
     warnings.push(`${o.roomName} 교실 정원/좌석 초과 (${o.count}/${o.capacity})`);
   });
 
+  _compactValidationWarnings = warnings;
   return warnings;
 }
 
@@ -1421,7 +1437,7 @@ function selectOutputType(type) {
     el.classList.toggle('active', on);
     el.hidden = !on;
   });
-  refreshOutputPreview();
+  refreshOutputPreview({ refreshChrome: true });
 }
 
 const ATTENDANCE_PAGE = {
@@ -1512,7 +1528,7 @@ const PERSONAL_BOARD_MIN_DATA_ROW_MM = 2.2;
 const PERSONAL_BOARD_ABSOLUTE_MIN_ROW_MM = 2.0;
 const PERSONAL_BOARD_COMPACT_THRESHOLD_MM = 3.2;
 const PERSONAL_BOARD_TIGHT_CHROME_THRESHOLD_MM = 3.8;
-const PERSONAL_BOARD_FIT_MAX_ATTEMPTS = 24;
+const PERSONAL_BOARD_FIT_MAX_ATTEMPTS = 8;
 const PERSONAL_BOARD_FIT_TOLERANCE = 0.992;
 
 function measurePersonalBoardChromePx(doc, table) {
@@ -1543,29 +1559,33 @@ function applyPersonalBoardRowSizing(doc, rowMm, { ultraFit = false } = {}) {
   void doc.offsetHeight;
 }
 
-function shrinkPersonalBoardToPage(doc, page, bodyRows, startRowMm, pageLimitMm) {
+function shrinkPersonalBoardToPage(doc, page, bodyRows, startRowMm, startHeightMm, pageLimitMm) {
   let rowMm = startRowMm;
   let ultraFit = false;
+  let table = doc.querySelector('.personal-board-table');
 
   const tryFit = () => {
     applyPersonalBoardRowSizing(doc, rowMm, { ultraFit });
-    const table = doc.querySelector('.personal-board-table');
+    table = doc.querySelector('.personal-board-table');
     const pxPerMm = getSeatMapPxPerMm(table, page.widthMm);
     return measurePersonalBoardDocHeightMm(doc, pxPerMm);
   };
+
+  // 1회 비율 추정으로 대부분 맞춤 (강제 리플로우 횟수 감소)
+  if (startHeightMm > pageLimitMm && startHeightMm > 0) {
+    rowMm = Math.max(
+      PERSONAL_BOARD_MIN_DATA_ROW_MM,
+      startRowMm * (pageLimitMm / startHeightMm) * 0.97
+    );
+  }
 
   let docHeightMm = tryFit();
 
   for (let attempt = 0; attempt < PERSONAL_BOARD_FIT_MAX_ATTEMPTS && docHeightMm > pageLimitMm; attempt++) {
     const overflowMm = docHeightMm - pageLimitMm + 0.8;
     const nextRowMm = Math.max(PERSONAL_BOARD_MIN_DATA_ROW_MM, rowMm - overflowMm / bodyRows);
-    if (nextRowMm >= rowMm - 0.015) break;
+    if (nextRowMm >= rowMm - 0.02) break;
     rowMm = nextRowMm;
-    docHeightMm = tryFit();
-  }
-
-  while (rowMm > PERSONAL_BOARD_MIN_DATA_ROW_MM && docHeightMm > pageLimitMm) {
-    rowMm = Math.max(PERSONAL_BOARD_MIN_DATA_ROW_MM, rowMm - 0.2);
     docHeightMm = tryFit();
   }
 
@@ -1574,8 +1594,8 @@ function shrinkPersonalBoardToPage(doc, page, bodyRows, startRowMm, pageLimitMm)
     docHeightMm = tryFit();
   }
 
-  while (rowMm > PERSONAL_BOARD_ABSOLUTE_MIN_ROW_MM && docHeightMm > pageLimitMm) {
-    rowMm = Math.max(PERSONAL_BOARD_ABSOLUTE_MIN_ROW_MM, rowMm - 0.12);
+  if (docHeightMm > pageLimitMm && rowMm > PERSONAL_BOARD_ABSOLUTE_MIN_ROW_MM) {
+    rowMm = PERSONAL_BOARD_ABSOLUTE_MIN_ROW_MM;
     docHeightMm = tryFit();
   }
 
@@ -1604,10 +1624,10 @@ function fitSinglePersonalBoardDoc(doc, page) {
 
   applyPersonalBoardRowSizing(doc, rowMm);
   const pxPerMm = getSeatMapPxPerMm(table, page.widthMm);
-  let docHeightMm = measurePersonalBoardDocHeightMm(doc, pxPerMm);
+  const docHeightMm = measurePersonalBoardDocHeightMm(doc, pxPerMm);
 
   if (docHeightMm > pageLimitMm) {
-    shrinkPersonalBoardToPage(doc, page, bodyRows, rowMm, pageLimitMm);
+    shrinkPersonalBoardToPage(doc, page, bodyRows, rowMm, docHeightMm, pageLimitMm);
   }
 }
 
@@ -1628,7 +1648,7 @@ const SEAT_MAP_FOOTER_RESERVE_MM = 2;
 const SEAT_MAP_SAFETY_MM = 5;
 const SEAT_MAP_MIN_CELL_MM = 8;
 const SEAT_MAP_MIN_COL_LABEL_MM = 5;
-const SEAT_MAP_FIT_MAX_ATTEMPTS = 16;
+const SEAT_MAP_FIT_MAX_ATTEMPTS = 8;
 const SEAT_MAP_FIT_TOLERANCE = 0.992;
 
 function measureSeatMapChromePx(doc, table) {
@@ -1673,7 +1693,6 @@ function applySeatMapCellSizing(doc, table, cellMm) {
   doc.classList.toggle('seat-map-compact', cellMm < 13.5);
   doc.classList.add('seat-map-fit-applied');
   void doc.offsetHeight;
-  void table?.offsetHeight;
 }
 
 function resetSeatMapFit(doc) {
@@ -1716,8 +1735,15 @@ function fitSingleSeatMapDoc(doc, page) {
   applySeatMapCellSizing(doc, table, cellMm);
   pxPerMm = getSeatMapPxPerMm(table, page.widthMm);
 
+  let docHeightMm = measureSeatMapDocHeightMm(doc, pxPerMm);
+  if (docHeightMm > pageLimitMm && docHeightMm > 0) {
+    cellMm = Math.max(SEAT_MAP_MIN_CELL_MM, cellMm * (pageLimitMm / docHeightMm) * 0.97);
+    applySeatMapCellSizing(doc, table, cellMm);
+    pxPerMm = getSeatMapPxPerMm(table, page.widthMm);
+  }
+
   for (let attempt = 0; attempt < SEAT_MAP_FIT_MAX_ATTEMPTS; attempt++) {
-    const docHeightMm = measureSeatMapDocHeightMm(doc, pxPerMm);
+    docHeightMm = measureSeatMapDocHeightMm(doc, pxPerMm);
     if (docHeightMm <= pageLimitMm) return;
 
     const overflowMm = docHeightMm - pageLimitMm + 1.2;
@@ -1731,12 +1757,12 @@ function fitSingleSeatMapDoc(doc, page) {
     pxPerMm = getSeatMapPxPerMm(table, page.widthMm);
   }
 
-  while (cellMm > SEAT_MAP_MIN_CELL_MM) {
-    const docHeightMm = measureSeatMapDocHeightMm(doc, pxPerMm);
-    if (docHeightMm <= pageLimitMm) return;
-    cellMm = Math.max(SEAT_MAP_MIN_CELL_MM, cellMm - 0.4);
-    applySeatMapCellSizing(doc, table, cellMm);
-    pxPerMm = getSeatMapPxPerMm(table, page.widthMm);
+  if (cellMm > SEAT_MAP_MIN_CELL_MM) {
+    docHeightMm = measureSeatMapDocHeightMm(doc, pxPerMm);
+    if (docHeightMm > pageLimitMm) {
+      cellMm = SEAT_MAP_MIN_CELL_MM;
+      applySeatMapCellSizing(doc, table, cellMm);
+    }
   }
 }
 
@@ -1747,9 +1773,10 @@ function fitSeatMapsToPage() {
 }
 
 function fitOutputPreviewToPage() {
-  fitAttendanceSheetsToPage();
-  fitSeatMapsToPage();
-  fitPersonalBoardsToPage();
+  const roots = '#output-preview, #bulk-export-stage';
+  if (document.querySelector(`${roots} .print-attendance-matrix`)) fitAttendanceSheetsToPage();
+  if (document.querySelector(`${roots} .print-seat-map`)) fitSeatMapsToPage();
+  if (document.querySelector(`${roots} .print-personal-board`)) fitPersonalBoardsToPage();
 }
 
 /* ========== 반별·시험실 일괄 zip 저장 ========== */
@@ -1973,9 +2000,9 @@ async function renderHtmlToPdfBlob(html, printSize, stageEl) {
   document.body.classList.add('bulk-export-active', 'print-mode');
   applyDynamicPrintPageStyle();
 
-  await waitAnimationFrames(4);
+  await waitAnimationFrames(2);
   fitOutputPreviewToPage();
-  await waitAnimationFrames(4);
+  await waitAnimationFrames(2);
 
   if (!outputHtmlHasDocuments(stageEl.innerHTML)) {
     stageEl.innerHTML = '';
@@ -2003,12 +2030,8 @@ async function renderHtmlToPdfBlob(html, printSize, stageEl) {
       el.style.maxWidth = `${cfg.contentWidthMm}mm`;
       el.style.boxSizing = 'border-box';
 
-      await waitAnimationFrames(2);
-      fitOutputPreviewToPage();
-      await waitAnimationFrames(2);
-
       const canvas = await html2canvasFn(el, {
-        scale: 2,
+        scale: 1.5,
         useCORS: true,
         logging: false,
         backgroundColor: '#ffffff',
@@ -2084,6 +2107,7 @@ async function runClassBulkExport() {
     return;
   }
   if (!confirmPrintWarnings()) return;
+  clearCompactValidationCache();
 
   const allPlans = buildBulkZipPlans(sel);
 
@@ -2146,10 +2170,16 @@ async function runClassBulkExport() {
   }
 }
 
-function refreshOutputPreview() {
-  renderOperationDashboard();
-  renderOperationDiagnosis();
+function refreshOutputPreview(options = {}) {
+  const { refreshChrome = false } = options;
+  clearCompactValidationCache();
+
+  if (refreshChrome) {
+    renderOperationDashboard();
+    renderOperationDiagnosis();
+  }
   renderOutputValidationBanner();
+
   const f = getFiltersFromCard(currentPreviewType);
   updatePrintSizeForCurrentOutput();
   $('#output-preview').innerHTML = renderOutputDocument(currentPreviewType, f);
@@ -2158,7 +2188,7 @@ function refreshOutputPreview() {
 
 function scheduleRefreshOutputPreview() {
   clearTimeout(outputPreviewDebounce);
-  outputPreviewDebounce = setTimeout(refreshOutputPreview, 80);
+  outputPreviewDebounce = setTimeout(() => refreshOutputPreview(), 120);
 }
 
 let step5OutputInitialized = false;
@@ -2408,7 +2438,7 @@ function initClassBulkExportUI() {
 function initStep5Output() {
   if (step5OutputInitialized) {
     refreshOutputFilters();
-    refreshOutputPreview();
+    refreshOutputPreview({ refreshChrome: true });
     return;
   }
   step5OutputInitialized = true;
@@ -2576,6 +2606,7 @@ function downloadAllGradesPdf(outputType) {
     if (classes.length > 24 && !confirm(`전체 학급 개인시간표는 ${classes.length}개 학급 분량입니다.\nPDF 저장에 시간이 걸릴 수 있습니다. 계속하시겠습니까?`)) return;
   }
 
+  clearCompactValidationCache();
   const html = renderOutputDocumentAllGrades(outputType, f);
   if (!outputHtmlHasDocuments(html)) {
     alert('전체 출력할 데이터가 없습니다.');
