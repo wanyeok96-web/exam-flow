@@ -957,36 +957,30 @@ function assignSeatsSplitByColumn(roomName, studentIds, seatConfig) {
 }
 
 function generateSeatPositions(rows, cols, fillDirection) {
-  const coords = [];
-  for (let r = 1; r <= rows; r++) {
-    for (let c = 1; c <= cols; c++) {
-      coords.push({ row: r, col: c });
-    }
-  }
-
   let ordered;
   switch (fillDirection) {
     case 'back-to-front':
-      ordered = [];
-      for (let r = rows; r >= 1; r--) {
-        for (let c = 1; c <= cols; c++) ordered.push({ row: r, col: c });
-      }
-      break;
-    case 'left-to-right':
+      // 왼쪽 열부터, 각 열은 뒤→앞
       ordered = [];
       for (let c = 1; c <= cols; c++) {
-        for (let r = 1; r <= rows; r++) ordered.push({ row: r, col: c });
+        for (let r = rows; r >= 1; r--) ordered.push({ row: r, col: c });
       }
       break;
     case 'right-to-left':
+      // 오른쪽 열부터, 각 열은 앞→뒤
       ordered = [];
       for (let c = cols; c >= 1; c--) {
         for (let r = 1; r <= rows; r++) ordered.push({ row: r, col: c });
       }
       break;
+    case 'left-to-right':
     case 'front-to-back':
     default:
-      ordered = coords;
+      // 왼쪽 열부터 1번, 같은 열에서 앞→뒤(2번…) — 이동 없음 교실·출력물 기준
+      ordered = [];
+      for (let c = 1; c <= cols; c++) {
+        for (let r = 1; r <= rows; r++) ordered.push({ row: r, col: c });
+      }
       break;
   }
 

@@ -421,10 +421,7 @@ body.print-size-b4-portrait {
   vertical-align: middle;
 }
 
-.print-personal-board .personal-board-table tr.pb-row-fixed td {
-  background-color: #e8e8e8;
-}
-
+.print-personal-board .personal-board-table tr.pb-row-fixed td,
 .print-personal-board .personal-board-table tr.pb-row-move td {
   background-color: #fff;
 }
@@ -1300,12 +1297,7 @@ body.print-size-b4-portrait {
     font-size: 0.58rem;
   }
 
-  .print-personal-board .personal-board-table tr.pb-row-fixed td {
-    background-color: #e8e8e8 !important;
-    -webkit-print-color-adjust: exact;
-    print-color-adjust: exact;
-  }
-
+  .print-personal-board .personal-board-table tr.pb-row-fixed td,
   .print-personal-board .personal-board-table tr.pb-row-move td {
     background-color: #fff !important;
   }
