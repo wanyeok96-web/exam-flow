@@ -18,7 +18,7 @@ const OUTPUT_DEFAULT_PRINT_SIZE = {
   'room-assignment': 'a4-portrait'
 };
 
-const ELECTIVE_STUDENTS_MAX_ROWS = 20;
+const ELECTIVE_STUDENTS_MIN_ROWS = 20;
 
 const DEFAULT_PRINT_SIZE = 'a4-portrait';
 
@@ -270,8 +270,13 @@ function buildElectiveStudentsTableHtml(columns) {
   });
   h3 += '</tr>';
 
+  const rowCount = Math.max(
+    ELECTIVE_STUDENTS_MIN_ROWS,
+    ...columns.map(col => col.students.length)
+  );
+
   let body = '';
-  for (let r = 0; r < ELECTIVE_STUDENTS_MAX_ROWS; r++) {
+  for (let r = 0; r < rowCount; r++) {
     body += `<tr><td class="es-col-order">${r + 1}</td>`;
     columns.forEach(col => {
       const st = col.students[r];
@@ -1637,6 +1642,74 @@ function fitPersonalBoardsToPage() {
   $$('#output-preview .print-personal-board, #bulk-export-stage .print-personal-board').forEach(doc => fitSinglePersonalBoardDoc(doc, page));
 }
 
+/* CSS @page size "B4"는 ISO B4(250×353mm)이므로 여백을 뺀 실제 인쇄 영역 기준 */
+const ELECTIVE_STUDENTS_PAGE = {
+  'a4-portrait': { heightMm: 273, widthMm: 186 },
+  'a4-landscape': { heightMm: 190, widthMm: 277 },
+  'b4-portrait': { heightMm: 337, widthMm: 234 },
+  'b4-landscape': { heightMm: 230, widthMm: 333 }
+};
+
+const CSS_PX_PER_MM = 96 / 25.4;
+const ELECTIVE_STUDENTS_TARGET_ROW_MM = 6.4;
+const ELECTIVE_STUDENTS_MIN_ROW_MM = 1.9;
+const ELECTIVE_STUDENTS_COMPACT_ROW_MM = 4.2;
+const ELECTIVE_STUDENTS_FIT_TOLERANCE = 0.97;
+const ELECTIVE_STUDENTS_FIT_MAX_ATTEMPTS = 10;
+
+function resetElectiveStudentsFit(doc) {
+  doc.classList.remove('elective-fit-applied', 'elective-fit-compact');
+  doc.style.removeProperty('--es-row-mm');
+  doc.style.removeProperty('width');
+  doc.style.removeProperty('max-width');
+}
+
+function applyElectiveStudentsRowSizing(doc, rowMm) {
+  doc.style.setProperty('--es-row-mm', `${rowMm.toFixed(2)}mm`);
+  doc.classList.toggle('elective-fit-compact', rowMm < ELECTIVE_STUDENTS_COMPACT_ROW_MM);
+  doc.classList.add('elective-fit-applied');
+  void doc.offsetHeight;
+}
+
+function measureElectiveStudentsDocHeightMm(doc) {
+  return Math.max(doc.getBoundingClientRect().height, doc.scrollHeight) / CSS_PX_PER_MM;
+}
+
+function fitSingleElectiveStudentsDoc(doc, page) {
+  resetElectiveStudentsFit(doc);
+
+  const table = doc.querySelector('.elective-students-table');
+  if (!table) return;
+  const bodyRows = table.querySelectorAll('tbody tr').length;
+  if (!bodyRows) return;
+
+  // 미리보기 폭이 아닌 실제 용지 폭에서 측정해야 인쇄 높이와 일치
+  doc.style.width = `${page.widthMm}mm`;
+  doc.style.maxWidth = 'none';
+
+  const pageLimitMm = page.heightMm * ELECTIVE_STUDENTS_FIT_TOLERANCE;
+  let rowMm = ELECTIVE_STUDENTS_TARGET_ROW_MM;
+  applyElectiveStudentsRowSizing(doc, rowMm);
+  let heightMm = measureElectiveStudentsDocHeightMm(doc);
+
+  for (let attempt = 0; attempt < ELECTIVE_STUDENTS_FIT_MAX_ATTEMPTS && heightMm > pageLimitMm; attempt++) {
+    const overflowMm = heightMm - pageLimitMm + 0.5;
+    const nextRowMm = Math.max(ELECTIVE_STUDENTS_MIN_ROW_MM, rowMm - overflowMm / bodyRows);
+    if (nextRowMm >= rowMm - 0.02) break;
+    rowMm = nextRowMm;
+    applyElectiveStudentsRowSizing(doc, rowMm);
+    heightMm = measureElectiveStudentsDocHeightMm(doc);
+  }
+
+  doc.style.maxWidth = '100%';
+}
+
+function fitElectiveStudentsToPage() {
+  const size = $('#print-size-select')?.value || DEFAULT_PRINT_SIZE;
+  const page = ELECTIVE_STUDENTS_PAGE[size] || ELECTIVE_STUDENTS_PAGE['b4-landscape'];
+  $$('#output-preview .print-elective-students, #bulk-export-stage .print-elective-students').forEach(doc => fitSingleElectiveStudentsDoc(doc, page));
+}
+
 const SEAT_MAP_PAGE = {
   'a4-portrait': { heightMm: 273, widthMm: 186 },
   'a4-landscape': { heightMm: 190, widthMm: 277 },
@@ -1777,6 +1850,7 @@ function fitOutputPreviewToPage() {
   if (document.querySelector(`${roots} .print-attendance-matrix`)) fitAttendanceSheetsToPage();
   if (document.querySelector(`${roots} .print-seat-map`)) fitSeatMapsToPage();
   if (document.querySelector(`${roots} .print-personal-board`)) fitPersonalBoardsToPage();
+  if (document.querySelector(`${roots} .print-elective-students`)) fitElectiveStudentsToPage();
 }
 
 /* ========== 반별·시험실 일괄 zip 저장 ========== */
@@ -2494,7 +2568,8 @@ function removePrintEnhancements() {
   [
     ['.print-attendance-matrix', 'attendance-fit-applied'],
     ['.print-seat-map', 'seat-map-fit-applied'],
-    ['.print-personal-board', 'personal-board-fit-applied']
+    ['.print-personal-board', 'personal-board-fit-applied'],
+    ['.print-elective-students', 'elective-fit-applied']
   ].forEach(([selector, appliedClass]) => {
     $$(selector).forEach(doc => {
       doc.classList.remove(appliedClass);
@@ -2518,6 +2593,10 @@ function removePrintEnhancements() {
         doc.style.removeProperty('--pb-data-row-mm');
         doc.style.removeProperty('--pb-page-width-mm');
         doc.style.removeProperty('--pb-printable-height-mm');
+      }
+      if (appliedClass === 'elective-fit-applied') {
+        doc.classList.remove('elective-fit-compact');
+        doc.style.removeProperty('--es-row-mm');
       }
     });
   });

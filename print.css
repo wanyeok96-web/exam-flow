@@ -504,6 +504,34 @@ body.print-size-b4-portrait {
   line-height: 1.25;
 }
 
+/* 선택과목 응시 학생 — 인원 수에 맞춰 행 높이 조정, 한 페이지 맞춤 (fit 적용 시) */
+.print-elective-students.elective-fit-applied {
+  box-sizing: border-box;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.print-elective-students.elective-fit-applied .elective-students-table tbody td {
+  height: var(--es-row-mm, 6.4mm) !important;
+  padding: clamp(0mm, calc((var(--es-row-mm, 6.4mm) - 2.2mm) * 0.25), 1mm) 0.1rem !important;
+  font-size: clamp(4.5pt, calc(var(--es-row-mm, 6.4mm) * 0.5), 8pt) !important;
+  line-height: 1.05 !important;
+  white-space: nowrap;
+  overflow: hidden;
+  box-sizing: border-box;
+  vertical-align: middle;
+}
+
+.print-elective-students.elective-fit-applied.elective-fit-compact .es-header {
+  margin-bottom: 0.15rem;
+  padding-bottom: 0.05rem;
+}
+
+.print-elective-students.elective-fit-applied.elective-fit-compact .elective-students-table th {
+  padding-top: 0.1rem;
+  padding-bottom: 0.1rem;
+}
+
 .move-badge {
   display: inline-block;
   font-size: 0.6rem;
@@ -1142,6 +1170,15 @@ body.print-size-b4-portrait {
   /* 선택과목 응시 학생 — B4 가로 */
   .print-elective-students {
     max-width: var(--print-page-width, 364mm);
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+
+  .print-elective-students .elective-students-table,
+  .print-elective-students .elective-students-table tbody,
+  .print-elective-students .elective-students-table tr {
+    page-break-inside: avoid;
+    break-inside: avoid;
   }
 
   .print-elective-students .es-header {
