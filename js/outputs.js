@@ -522,7 +522,7 @@ const ATTENDANCE_DATA_ROWS = 21;
 
 function getAttendanceGroupRowCount(group) {
   const count = group.studentIds.length;
-  if (group.isHome || count >= 20) return ATTENDANCE_DATA_ROWS;
+  if (group.isHome || count >= 20) return Math.max(count, ATTENDANCE_DATA_ROWS);
   return Math.max(count, 1);
 }
 
@@ -1457,6 +1457,19 @@ const ATTENDANCE_SAFETY_MM = 8;
 const ATTENDANCE_GROUP_FIXED_MM = 16;
 const ATTENDANCE_MIN_DATA_ROW_MM = 2.8;
 const ATTENDANCE_PRINT_BUFFER_MM = 6;
+const ATTENDANCE_MAX_DATA_FONT_PT = 8.5;
+const ATTENDANCE_MIN_DATA_FONT_PT = 5.5;
+
+/** 표 셀은 글자 높이보다 작아지지 않으므로 행 높이에 맞춰 글자 크기도 줄인다 */
+function getAttendanceDataFontPt(rowMm) {
+  const fitPt = (rowMm - 0.9) / 1.15 / 0.3528;
+  return Math.min(ATTENDANCE_MAX_DATA_FONT_PT, Math.max(ATTENDANCE_MIN_DATA_FONT_PT, fitPt));
+}
+
+function applyAttendanceRowSize(doc, rowMm) {
+  doc.style.setProperty('--att-data-row-mm', `${rowMm.toFixed(2)}mm`);
+  doc.style.setProperty('--att-data-font-pt', `${getAttendanceDataFontPt(rowMm).toFixed(2)}pt`);
+}
 
 function measureAttendanceChromePx(doc, stack) {
   let chrome = 0;
@@ -1488,6 +1501,7 @@ function fitAttendanceSheetsToPage() {
   $$('#output-preview .print-attendance-matrix, #bulk-export-stage .print-attendance-matrix').forEach(doc => {
     doc.classList.remove('attendance-fit-applied');
     doc.style.removeProperty('--att-data-row-mm');
+    doc.style.removeProperty('--att-data-font-pt');
 
     const stack = doc.querySelector('.att-group-stack');
     const table = stack?.querySelector('.attendance-group-table');
@@ -1506,7 +1520,7 @@ function fitAttendanceSheetsToPage() {
     );
 
     for (let attempt = 0; attempt < 8; attempt++) {
-      doc.style.setProperty('--att-data-row-mm', `${dataRowMm.toFixed(2)}mm`);
+      applyAttendanceRowSize(doc, dataRowMm);
       doc.classList.add('attendance-fit-applied');
       void doc.offsetHeight;
       if (doc.scrollHeight <= pageHeightPx * 0.992) break;
@@ -2587,6 +2601,7 @@ function removePrintEnhancements() {
       }
       if (appliedClass === 'attendance-fit-applied') {
         doc.style.removeProperty('--att-data-row-mm');
+        doc.style.removeProperty('--att-data-font-pt');
       }
       if (appliedClass === 'personal-board-fit-applied') {
         doc.classList.remove('personal-board-compact', 'personal-board-tight-chrome', 'personal-board-ultra-fit');

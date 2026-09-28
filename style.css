@@ -2884,7 +2884,13 @@ body.bulk-export-active .bulk-export-stage {
   height: var(--att-data-row-mm, 5.2mm);
   min-height: 0;
   max-height: var(--att-data-row-mm, 5.2mm);
-  font-size: 0.78rem;
+  font-size: var(--att-data-font-pt, 0.78rem);
+}
+
+.output-preview .attendance-fit-applied .attendance-group-table .att-data-row td {
+  padding-top: 0;
+  padding-bottom: 0;
+  line-height: 1.15;
 }
 
 .output-preview .attendance-group-table .att-status-cell.is-elective {

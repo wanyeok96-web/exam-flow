@@ -1105,15 +1105,21 @@ body.print-size-b4-portrait {
     min-height: 0;
     max-height: var(--att-data-row-mm, 4.6mm);
     overflow: hidden;
-    font-size: 8.5pt;
+    font-size: var(--att-data-font-pt, 8.5pt);
+  }
+
+  .print-attendance-matrix.attendance-fit-applied .attendance-group-table .att-data-row td {
+    padding-top: 0;
+    padding-bottom: 0;
+    line-height: 1.15;
   }
 
   .attendance-group-table .att-num {
-    font-size: 8.5pt;
+    font-size: var(--att-data-font-pt, 8.5pt);
   }
 
   .attendance-group-table .att-name {
-    font-size: 8.5pt;
+    font-size: var(--att-data-font-pt, 8.5pt);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
